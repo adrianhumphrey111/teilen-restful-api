@@ -18,14 +18,14 @@ class Car(ndb.Model):
     num_of_trips = ndb.IntegerProperty()
     num_of_seats = ndb.IntegerProperty()
     
-class UserStatus(messages.Enum):
+class UserStatus(ndb.Model):
     NOT_LOOKING = "Currently Not Looking."
     DRIVING = "Currently Driving To Destination"
     RIDING = "Currently On The Way To Destination"
     LOOKING_RIDE = "Currently Looking For a Ride"
     LOOKING_PASSENGERS = "Currently Looking For Passengers."
 
-class TripStatus(messages.Enum):
+class TripStatus(ndb.Model):
     IN_PROGRESS = "Trip Currently In Progress"
     LOOKING = "Looking For Passengers"
     BOOKED = "Trip Not Started But Full"
@@ -34,6 +34,7 @@ class TripStatus(messages.Enum):
 
 class Like(ndb.Model):
     user_id = ndb.IntegerProperty()
+    post_id = ndb.IntegerProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True)
 
 class Comment(ndb.Model):
@@ -46,8 +47,19 @@ class Post(ndb.Model):
     user_id = ndb.IntegerProperty()
     text = ndb.StringProperty()
     likes = ndb.StructuredProperty(Like, repeated=True)
-    comments = ndb.StructuredProperty(Comment, repeated=True)
+    comment_ids = ndb.IntegerProperty(repeated=True)
     created_at = ndb.DateTimeProperty(auto_now_add=True) 
+    
+    @classmethod
+    def create_post(cls, user_id, text, likes=[], comment_ids=[]):
+        post = Post(user_id=user_id, text=text, likes=likes, comment_ids=comment_ids)
+        return post.put()
+    
+    @classmethod
+    def add_like(cls, like):
+        post = Post.get_by_id(like.post_id)
+        post.likes.append(like)
+        return post.put()
     
 class Rating(ndb.Model):
     rating = ndb.IntegerProperty()
@@ -66,28 +78,46 @@ class Trip(ndb.Model):
     passenger_ids = ndb.IntegerProperty(repeated=True)
     seats = ndb.IntegerProperty()
     seats_avialble = ndb.IntegerProperty()
-    status = msgprop.EnumProperty(TripStatus, required=True)
+    status = ndb.StructuredProperty(TripStatus)
     rate_per_seat = ndb.IntegerProperty() #in USD
 
 class User(ndb.Model):
     first_name = ndb.StringProperty()
     last_name = ndb.StringProperty()
-    emai = ndb.StringProperty()
+    email = ndb.StringProperty()
     school = ndb.StringProperty()
     location = ndb.StructuredProperty(Location)
     car = ndb.StructuredProperty(Car)
-    status = msgprop.EnumProperty(UserStatus, required=True)
+    status = ndb.StructuredProperty(UserStatus)
     billing_info = ndb.StringProperty()
     profile_pic_url = ndb.StringProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True)
-    current_trip = ndb.StructuredProperty(Trip)
-    planned_trips = ndb.StructuredProperty(Trip, repeated=True)
-    completed_trips = ndb.StructuredProperty(Trip, repeated=True)
+    current_trip_id = ndb.StructuredProperty(Trip)
+    planned_trip_ids = ndb.IntegerProperty(repeated=True)
+    completed_trip_ids = ndb.IntegerProperty(repeated=True)
     rating = ndb.FloatProperty()
     reviews = ndb.StructuredProperty(Review, repeated=True)
-    posts = ndb.StructuredProperty(Post, repeated=True)
+    post_id = ndb.IntegerProperty(repeated=True)
+    
+    @classmethod
+    def create_new_user(self, **kwargs):
+        user = User()
+        for key in kwargs:
+            #update any value that is in kwargs
+            setattr(user, key, kwargs[key])
+        return user.put()
+    
+    @classmethod
+    def updateUser(self, key, **kwargs):
+        user = key.get()
+        for key in kwargs:
+            #update any value that is in kwargs
+            setattr(user, key, kwargs[key])
+        return user.put()
+        
+        
 
-class TripType(messages.Enum):
+class TripType(ndb.Model):
     LONG = 'Long'
     MEDIUM = 'Medium'
     SHORT = 'Short'

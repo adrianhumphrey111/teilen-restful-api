@@ -16,6 +16,7 @@
 #
 import webapp2
 from google.appengine.api import taskqueue
+import ast
 
 
 class MainHandler(webapp2.RequestHandler):
@@ -35,8 +36,8 @@ class LikePostTaskHandler(webapp2.RequestHandler):
         task = taskqueue.add(
             url='/tasks/likePost',
             target='worker',
-            params={'user_id': int(self.request.get('user_id')),
-                    'media_post_id': int(self.request.get('media_post_id'))})
+            params={'user_id': str(self.request.get('user_id')),
+                    'post_id': str(self.request.get('post_id'))})
         
         #Should be a response to the user that says, they have liked the post
         self.response.write(
@@ -48,8 +49,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         task = taskqueue.add(
             url='/tasks/createPost',
             target='worker',
-            params={'media_post_id': int(self.request.get('media_post_id')),
-                    'user_id': int(self.request.get('user_id')),
+            params={'user_id': str(self.request.get('user_id')),
                     'post_text': str(self.request.get('post_text'))
                              })
         #Should be a response to the user that says, they have liked the post
@@ -62,7 +62,18 @@ class FetchPostsHandler(webapp2.RequestHandler):
     
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
-        pass
+        params = self.request.get('update_dict')
+        
+        #Add this task to create User to the task queue
+        task = taskqueue.add(
+            url='/tasks/updateUser',
+            target='worker',
+            params=params)
+        #Should be a response to the user that says, they have liked the post
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+    
+    
     
 class CreateUserTasksHandler(webapp2.RequestHandler):
     def post(self):
