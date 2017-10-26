@@ -55,6 +55,7 @@
 <path>${GOOGLE_APP_ENGINE}/lib/websocket</path>
 <path>${GOOGLE_APP_ENGINE}/lib/yaml-3.10</path>
 <path>${GOOGLE_APP_ENGINE}/lib/yaml/lib</path>
+<path>/Library/Frameworks/Python.framework/Versions/2.7/lib/python2.7/site-packages/bson</path>
 </pydev_pathproperty>
 <pydev_property name="org.python.pydev.PYTHON_PROJECT_VERSION">python 2.7</pydev_property>
 <pydev_property name="org.python.pydev.PYTHON_PROJECT_INTERPRETER">Default</pydev_property>

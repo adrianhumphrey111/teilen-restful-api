@@ -28,6 +28,7 @@ class CreatePostHandler(webapp2.RequestHandler):
         post_text=str(self.request.get('post_text'))
         post = Post.create_post(user_id=user_id, text=post_text)
         print 'User successfully added and the id is => ' + str(post.id())
+        self.response.write('This is the response from creating post')
         
 class CreateUserHandler(webapp2.RequestHandler):
     def post(self): 

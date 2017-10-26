@@ -16,7 +16,15 @@
 #
 import webapp2
 from google.appengine.api import taskqueue
-import ast
+from models import Post
+from postFetcher import PostFetcher
+import json
+import datetime
+
+def datetime_handler(x):
+    if isinstance(x, datetime.datetime):
+        return x.isoformat()
+    raise TypeError("Unknown type")
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
@@ -57,8 +65,14 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         
 class FetchPostsHandler(webapp2.RequestHandler):
     def get(self):
-        pass
-    
+        #return a fetch object with all posts and appropriate things needed for the app to populate
+        feed = PostFetcher(user_id=int(self.request.get('user_id')))
+        posts = feed.get_all_posts()
+        self.response.headers['Content-Type'] = 'application/json'  
+        obj = {'feed': posts } 
+        
+        self.response.out.write(json.dumps(obj, default=datetime_handler)) 
+        
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
         params = self.request.get('update_dict')
@@ -72,8 +86,7 @@ class UpdateUserHandler(webapp2.RequestHandler):
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
     
-    
-    
+
 class CreateUserTasksHandler(webapp2.RequestHandler):
     def post(self):
         #Add this task to create User to the task queue
@@ -101,6 +114,42 @@ class CommentPostTasksHandler(webapp2.RequestHandler):
         #Should be a response to the user that says, they have liked the post
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        
+class DeletePostHandler(webapp2.RequestHandler):
+    def post(self):
+        Post.delete_post(int(self.request.get('post_id')))
+        self.response.write('Post successfully deleted')
+        
+class AddFriendTasksHandler(webapp2.RequestHandler):
+    def post(self):
+        #Add this task to add friend to list of friends
+        task = taskqueue.add(
+            url='/tasks/commentPost',
+            target='worker',
+            params={'user_id': str(self.request.get('user_id')),
+                    'post_id': str(self.request.get('post_id')),
+                    'comment': str(self.request.get('comment'))
+                             })
+        #Should be a response to the user that says, they have liked the post
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        
+class RequestFriendTaksHandler(webapp2.RequestHandler):
+    def post(self):
+        #Add this task to add friend to list of friends
+        task = taskqueue.add(
+            url='/tasks/commentPost',
+            target='worker',
+            params={'user_id': str(self.request.get('user_id')),
+                    'post_id': str(self.request.get('post_id')),
+                    'comment': str(self.request.get('comment'))
+                             })
+        #Should be a response to the user that says, they have liked the post
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        
+        
+        
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
@@ -112,6 +161,7 @@ app = webapp2.WSGIApplication([
     ('/api/fetchPost', FetchPostsHandler),
     ('/api/createUser', CreateUserTasksHandler),
     ('/api/updateUser', UpdateUserHandler),
-    
-    
+    ('/api/deletePost', DeletePostHandler),
+    ('/api/addFriend', AddFriendTasksHandler),
+    ('api/requestFriend', RequestFriendTaksHandler)
 ], debug=True)

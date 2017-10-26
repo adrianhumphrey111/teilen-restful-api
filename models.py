@@ -1,6 +1,7 @@
 from google.appengine.ext import ndb
 from protorpc import messages
 from google.appengine.ext.ndb import msgprop
+from __builtin__ import classmethod
 
 
 class Location(ndb.Model):
@@ -55,7 +56,10 @@ class Post(ndb.Model):
     @classmethod
     def create_post(cls, user_id, text, likes=[], comment_ids=[]):
         post = Post(user_id=user_id, text=text, likes=likes, comment_ids=comment_ids)
-        return post.put()
+        user = ndb.Key('User', user_id).get()
+        key = post.put()
+        user.post_ids.append( key.id() )
+        return user.put()
     
     @classmethod
     def add_like(cls, like):
@@ -70,6 +74,11 @@ class Post(ndb.Model):
         key = comment.put()
         post.comment_ids.append( key.id() )
         return post.put()
+    
+    @classmethod
+    def delete_post(cls, post_id):
+        key = ndb.Key('Post', post_id)
+        key.delete()
     
 class Rating(ndb.Model):
     rating = ndb.IntegerProperty()
@@ -107,7 +116,8 @@ class User(ndb.Model):
     completed_trip_ids = ndb.IntegerProperty(repeated=True)
     rating = ndb.FloatProperty()
     reviews = ndb.StructuredProperty(Review, repeated=True)
-    post_id = ndb.IntegerProperty(repeated=True)
+    post_ids = ndb.IntegerProperty(repeated=True)
+    friend_ids = ndb.IntegerProperty(repeated=True)
     
     @classmethod
     def create_new_user(self, **kwargs):
@@ -115,6 +125,14 @@ class User(ndb.Model):
         for key in kwargs:
             #update any value that is in kwargs
             setattr(user, key, kwargs[key])
+        user.friend_ids = []
+        user.post_ids = []
+        user.reviews = []
+        user.rating = 5
+        user.completed_trip_ids = []
+        user.planned_trip_ids = []
+        user.current_trip_id = None
+        
         return user.put()
     
     @classmethod
@@ -124,6 +142,15 @@ class User(ndb.Model):
             #update any value that is in kwargs
             setattr(user, key, kwargs[key])
         return user.put()
+    
+    @classmethod
+    def retrieve_all_post(self, key):
+        user = key.get()
+        posts = []
+        if hasattr(user, 'post_ids'): #the user has atleast one friend
+            for post_id in user.post_ids:
+                posts.append( ndb.Key( 'Post', post_id).get().to_dict() )
+        return posts
         
         
 
