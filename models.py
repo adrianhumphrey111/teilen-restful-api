@@ -39,9 +39,11 @@ class Like(ndb.Model):
 
 class Comment(ndb.Model):
     user_id = ndb.IntegerProperty()
+    post_id = ndb.IntegerProperty()
     text = ndb.StringProperty()
-    created_at = ndb.DateTimeProperty(auto_now_add=True)
     likes = ndb.StructuredProperty(Like, repeated=True)
+    created_at = ndb.DateTimeProperty(auto_now_add=True)
+    
 
 class Post(ndb.Model):
     user_id = ndb.IntegerProperty()
@@ -59,6 +61,14 @@ class Post(ndb.Model):
     def add_like(cls, like):
         post = Post.get_by_id(like.post_id)
         post.likes.append(like)
+        like.put()
+        return post.put()
+    
+    @classmethod
+    def add_comment(cls, comment):
+        post = Post.get_by_id(comment.post_id)
+        key = comment.put()
+        post.comment_ids.append( key.id() )
         return post.put()
     
 class Rating(ndb.Model):

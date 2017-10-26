@@ -18,7 +18,6 @@ import webapp2
 from google.appengine.api import taskqueue
 import ast
 
-
 class MainHandler(webapp2.RequestHandler):
     def get(self):
         self.response.write('Hello world!')
@@ -88,15 +87,31 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
         #Should be a response to the user that says, they have liked the post
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        
+class CommentPostTasksHandler(webapp2.RequestHandler):
+    def post(self):
+        #Add this task to create User to the task queue
+        task = taskqueue.add(
+            url='/tasks/commentPost',
+            target='worker',
+            params={'user_id': str(self.request.get('user_id')),
+                    'post_id': str(self.request.get('post_id')),
+                    'comment': str(self.request.get('comment'))
+                             })
+        #Should be a response to the user that says, they have liked the post
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
     ('/api/login', LoginHandler),
     ('/api/search', SearchHandler),
     ('/api/likePost', LikePostTaskHandler),
+    ('/api/commentPost', CommentPostTasksHandler),
     ('/api/createPost', CreateMediaPostTaskHandler),
     ('/api/fetchPost', FetchPostsHandler),
     ('/api/createUser', CreateUserTasksHandler),
     ('/api/updateUser', UpdateUserHandler),
+    
     
 ], debug=True)
