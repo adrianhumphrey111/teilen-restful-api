@@ -124,11 +124,10 @@ class AddFriendTasksHandler(webapp2.RequestHandler):
     def post(self):
         #Add this task to add friend to list of friends
         task = taskqueue.add(
-            url='/tasks/commentPost',
+            url='/tasks/addFriend',
             target='worker',
-            params={'user_id': str(self.request.get('user_id')),
-                    'post_id': str(self.request.get('post_id')),
-                    'comment': str(self.request.get('comment'))
+            params={'friend_id': str(self.request.get('friend_id')),
+                    'user_id': str(self.request.get('user_id'))
                              })
         #Should be a response to the user that says, they have liked the post
         self.response.write(
@@ -138,11 +137,10 @@ class RequestFriendTaksHandler(webapp2.RequestHandler):
     def post(self):
         #Add this task to add friend to list of friends
         task = taskqueue.add(
-            url='/tasks/commentPost',
+            url='/tasks/requestFriend',
             target='worker',
             params={'user_id': str(self.request.get('user_id')),
-                    'post_id': str(self.request.get('post_id')),
-                    'comment': str(self.request.get('comment'))
+                    'friend_id': str(self.request.get('friend_id'))
                              })
         #Should be a response to the user that says, they have liked the post
         self.response.write(
@@ -163,5 +161,5 @@ app = webapp2.WSGIApplication([
     ('/api/updateUser', UpdateUserHandler),
     ('/api/deletePost', DeletePostHandler),
     ('/api/addFriend', AddFriendTasksHandler),
-    ('api/requestFriend', RequestFriendTaksHandler)
+    ('/api/requestFriend', RequestFriendTaksHandler)
 ], debug=True)

@@ -50,11 +50,22 @@ class CommentPostHandler(webapp2.RequestHandler):
             
         commentPost(user_id=user_id, post_id=post_id, comment=comment_text )
 
+class AddFriendHandler(webapp2.RequestHandler):
+    def post(self):
+        User.add_friend( key=ndb.Key( 'User', int(self.request.get('user_id'))), friend_id=int(self.request.get('friend_id')))
         
-
+        
+class RequestFriendHandler(webapp2.RequestHandler):
+    def post(self):
+        User.request_friend(key=ndb.Key( 'User', int(self.request.get('user_id'))), friend_key=ndb.Key( 'User', int(self.request.get('friend_id'))))
+        
+        
+        
 app = webapp2.WSGIApplication([
     ('/tasks/likePost', LikeMediaPostHandler),
     ('/tasks/commentPost', CommentPostHandler),
     ('/tasks/createPost', CreatePostHandler),
-    ('/tasks/createUser', CreateUserHandler)
+    ('/tasks/createUser', CreateUserHandler),
+    ('/tasks/addFriend', AddFriendHandler),
+    ('/tasks/requestFriend', RequestFriendHandler)
 ], debug=True)

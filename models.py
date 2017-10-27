@@ -1,7 +1,6 @@
 from google.appengine.ext import ndb
 from protorpc import messages
 from google.appengine.ext.ndb import msgprop
-from __builtin__ import classmethod
 
 
 class Location(ndb.Model):
@@ -118,6 +117,8 @@ class User(ndb.Model):
     reviews = ndb.StructuredProperty(Review, repeated=True)
     post_ids = ndb.IntegerProperty(repeated=True)
     friend_ids = ndb.IntegerProperty(repeated=True)
+    friend_request_ids = ndb.IntegerProperty()
+    requested_friend_ids = ndb.IntegerProperty()
     
     @classmethod
     def create_new_user(self, **kwargs):
@@ -131,6 +132,8 @@ class User(ndb.Model):
         user.rating = 5
         user.completed_trip_ids = []
         user.planned_trip_ids = []
+        user.friend_request_ids = []
+        user.requested_friend_ids = []
         user.current_trip_id = None
         
         return user.put()
@@ -151,6 +154,21 @@ class User(ndb.Model):
             for post_id in user.post_ids:
                 posts.append( ndb.Key( 'Post', post_id).get().to_dict() )
         return posts
+    
+    @classmethod
+    def add_friend(cls, key, friend_id):
+        user = key.get()
+        user.friend_ids.append( friend_id )
+        return user.put()
+    
+    @classmethod
+    def request_friend(cls, key, friend_key):
+        user = key.get()
+        friend = friend_key.get()
+        user.requested_friend_ids.append( friend_key.id() )
+        friend.friend_request_ids.append( key.id() )
+        friend.put()
+        return user.put()
         
         
 

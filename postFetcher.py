@@ -25,8 +25,8 @@ class PostFetcher:
             
     def addAllPosts(self):
         for user in self.users:
-            self.posts.append( User.retrieve_all_post(self.key) )
-        print 'Final feed => ' + str(self.posts)
+            for post in User.retrieve_all_post( user.key ):
+                self.posts.append( post )
         
     def get_all_posts(self):
         return self.posts
