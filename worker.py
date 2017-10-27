@@ -13,21 +13,14 @@ class LikeMediaPostHandler(webapp2.RequestHandler):
     def post(self):
         user_id = int(self.request.get('user_id'))
         post_id = int(self.request.get('post_id'))
+        like = Like(user_key=ndb.Key('User', user_id), post_key=ndb.Key('Post', post_id)).put()
 
-        # This task should run at most once per second because of the datastore
-        # transaction write throughput.
-        def likePost(user_id, post_id):
-            like = Like(user_id=user_id, post_id=post_id)
-            Post.add_like(like) #like object will contain media id and user id
-            
-        likePost(user_id=user_id, post_id=post_id)
  
 class CreatePostHandler(webapp2.RequestHandler):
     def post(self):
         user_id=int(self.request.get('user_id'))
         post_text=str(self.request.get('post_text'))
         post = Post.create_post(user_id=user_id, text=post_text)
-        print 'User successfully added and the id is => ' + str(post.id())
         self.response.write('This is the response from creating post')
         
 class CreateUserHandler(webapp2.RequestHandler):
@@ -43,12 +36,8 @@ class CommentPostHandler(webapp2.RequestHandler):
         user_id = int(self.request.get('user_id'))
         post_id = int(self.request.get('post_id'))
         comment_text = str(self.request.get('comment'))
-        
-        def commentPost(user_id, post_id, comment):
-            comment = Comment(user_id=user_id, post_id=post_id, text=comment_text, likes=[])
-            Post.add_comment(comment)
+        comment = Comment(user_key=ndb.Key('User', user_id), post_key=ndb.Key('Post', post_id), text=comment_text).put()
             
-        commentPost(user_id=user_id, post_id=post_id, comment=comment_text )
 
 class AddFriendHandler(webapp2.RequestHandler):
     def post(self):

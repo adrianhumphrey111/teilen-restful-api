@@ -32,60 +32,7 @@ class TripStatus(ndb.Model):
     COMPLETED = "Trip Has Been Completed"
 
 
-class Like(ndb.Model):
-    user_id = ndb.IntegerProperty()
-    post_id = ndb.IntegerProperty()
-    created_at = ndb.DateTimeProperty(auto_now_add=True)
 
-class Comment(ndb.Model):
-    user_id = ndb.IntegerProperty()
-    post_id = ndb.IntegerProperty()
-    text = ndb.StringProperty()
-    likes = ndb.StructuredProperty(Like, repeated=True)
-    created_at = ndb.DateTimeProperty(auto_now_add=True)
-    
-
-class Post(ndb.Model):
-    user_id = ndb.IntegerProperty()
-    text = ndb.StringProperty()
-    likes = ndb.StructuredProperty(Like, repeated=True)
-    comment_ids = ndb.IntegerProperty(repeated=True)
-    created_at = ndb.DateTimeProperty(auto_now_add=True) 
-    
-    @classmethod
-    def create_post(cls, user_id, text, likes=[], comment_ids=[]):
-        post = Post(user_id=user_id, text=text, likes=likes, comment_ids=comment_ids)
-        user = ndb.Key('User', user_id).get()
-        key = post.put()
-        user.post_ids.append( key.id() )
-        return user.put()
-    
-    @classmethod
-    def add_like(cls, like):
-        post = Post.get_by_id(like.post_id)
-        post.likes.append(like)
-        like.put()
-        return post.put()
-    
-    @classmethod
-    def add_comment(cls, comment):
-        post = Post.get_by_id(comment.post_id)
-        key = comment.put()
-        post.comment_ids.append( key.id() )
-        return post.put()
-    
-    @classmethod
-    def delete_post(cls, post_id):
-        key = ndb.Key('Post', post_id)
-        key.delete()
-    
-class Rating(ndb.Model):
-    rating = ndb.IntegerProperty()
-
-class Review(ndb.Model):
-    user_id = ndb.IntegerProperty()
-    text = ndb.StringProperty()
-    rating = ndb.StructuredProperty(Rating)
     
 class Trip(ndb.Model):
     start_time = ndb.DateTimeProperty()
@@ -114,11 +61,10 @@ class User(ndb.Model):
     planned_trip_ids = ndb.IntegerProperty(repeated=True)
     completed_trip_ids = ndb.IntegerProperty(repeated=True)
     rating = ndb.FloatProperty()
-    reviews = ndb.StructuredProperty(Review, repeated=True)
-    post_ids = ndb.IntegerProperty(repeated=True)
+    post_ids = ndb.IntegerProperty(repeated=True) #one to many relationship 
     friend_ids = ndb.IntegerProperty(repeated=True)
-    friend_request_ids = ndb.IntegerProperty()
-    requested_friend_ids = ndb.IntegerProperty()
+    friend_request_ids = ndb.IntegerProperty(repeated=True)
+    requested_friend_ids = ndb.IntegerProperty(repeated=True)
     
     @classmethod
     def create_new_user(self, **kwargs):
@@ -148,11 +94,10 @@ class User(ndb.Model):
     
     @classmethod
     def retrieve_all_post(self, key):
-        user = key.get()
         posts = []
-        if hasattr(user, 'post_ids'): #the user has atleast one friend
-            for post_id in user.post_ids:
-                posts.append( ndb.Key( 'Post', post_id).get().to_dict() )
+        for post in Post.query(Post.user_key == key).fetch():
+            post.user = key.get()
+            posts.append( post.to_dict() )
         return posts
     
     @classmethod
@@ -170,6 +115,48 @@ class User(ndb.Model):
         friend.put()
         return user.put()
         
+class Post(ndb.Model):
+    user_key = ndb.KeyProperty(kind=User)
+    user = ndb.StructuredProperty(User)
+    text = ndb.StringProperty()
+    created_at = ndb.DateTimeProperty(auto_now_add=True) 
+    
+    @classmethod
+    def create_post(cls, user_id, text, likes=[], comment_ids=[]):
+        user_key = ndb.Key('User', user_id)
+        post = Post(user_key=user_key, text=text, likes=likes, comment_ids=comment_ids).put()
+        return post
+
+    @classmethod
+    def delete_post(cls, post_id):
+        key = ndb.Key('Post', post_id)
+        key.delete()
+        
+class Comment(ndb.Model):
+    user_key = ndb.KeyProperty(kind=User)
+    post_key = ndb.KeyProperty(kind=Post)
+    text = ndb.StringProperty()
+    created_at = ndb.DateTimeProperty(auto_now_add=True)
+    
+    @classmethod
+    def delete_comment(cls, comment_id):
+        key = ndb.Key('Comment', comment_id)
+        key.delete()
+    
+class Like(ndb.Model):
+    user_key = ndb.KeyProperty(kind=User)
+    post_key = ndb.KeyProperty(kind=Post)
+    comment_key = ndb.KeyProperty(kind=Comment)
+    created_at = ndb.DateTimeProperty(auto_now_add=True)
+    
+    
+class Rating(ndb.Model):
+    rating = ndb.IntegerProperty()
+
+class Review(ndb.Model):
+    user_key = ndb.KeyProperty(kind=User)
+    text = ndb.StringProperty()
+    rating = ndb.StructuredProperty(Rating)
         
 
 class TripType(ndb.Model):

@@ -15,15 +15,19 @@
 # limitations under the License.
 #
 import webapp2
+from google.appengine.ext import ndb
+import google
 from google.appengine.api import taskqueue
 from models import Post
 from postFetcher import PostFetcher
 import json
 import datetime
 
-def datetime_handler(x):
+def json_handler(x):
     if isinstance(x, datetime.datetime):
         return x.isoformat()
+    if isinstance(x, google.appengine.ext.ndb.key.Key):
+        return str(x)
     raise TypeError("Unknown type")
 
 class MainHandler(webapp2.RequestHandler):
@@ -70,8 +74,8 @@ class FetchPostsHandler(webapp2.RequestHandler):
         posts = feed.get_all_posts()
         self.response.headers['Content-Type'] = 'application/json'  
         obj = {'feed': posts } 
-        
-        self.response.out.write(json.dumps(obj, default=datetime_handler)) 
+        print posts
+        self.response.out.write(json.dumps(obj, default=json_handler)) 
         
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
