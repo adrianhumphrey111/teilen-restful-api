@@ -18,7 +18,7 @@ import webapp2
 from google.appengine.ext import ndb
 import google
 from google.appengine.api import taskqueue
-from models import Post
+from models import Post, User
 from postFetcher import PostFetcher
 import json
 import datetime
@@ -47,8 +47,8 @@ class LikePostTaskHandler(webapp2.RequestHandler):
         task = taskqueue.add(
             url='/tasks/likePost',
             target='worker',
-            params={'user_id': str(self.request.get('user_id')),
-                    'post_id': str(self.request.get('post_id'))})
+            params={'user_key': str(self.request.get('user_key')),
+                    'post_key': str(self.request.get('post_key'))})
         
         #Should be a response to the user that says, they have liked the post
         self.response.write(
@@ -60,7 +60,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         task = taskqueue.add(
             url='/tasks/createPost',
             target='worker',
-            params={'user_id': str(self.request.get('user_id')),
+            params={'user_key': str(self.request.get('user_key')),
                     'post_text': str(self.request.get('post_text'))
                              })
         #Should be a response to the user that says, they have liked the post
@@ -70,11 +70,10 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
 class FetchPostsHandler(webapp2.RequestHandler):
     def get(self):
         #return a fetch object with all posts and appropriate things needed for the app to populate
-        feed = PostFetcher(user_id=int(self.request.get('user_id')))
+        feed = PostFetcher(user_key=int(self.request.get('user_key')))
         posts = feed.get_all_posts()
         self.response.headers['Content-Type'] = 'application/json'  
         obj = {'feed': posts } 
-        print posts
         self.response.out.write(json.dumps(obj, default=json_handler)) 
         
 class UpdateUserHandler(webapp2.RequestHandler):
@@ -111,8 +110,8 @@ class CommentPostTasksHandler(webapp2.RequestHandler):
         task = taskqueue.add(
             url='/tasks/commentPost',
             target='worker',
-            params={'user_id': str(self.request.get('user_id')),
-                    'post_id': str(self.request.get('post_id')),
+            params={'user_key': str(self.request.get('user_key')),
+                    'post_key': str(self.request.get('post_key')),
                     'comment': str(self.request.get('comment'))
                              })
         #Should be a response to the user that says, they have liked the post
@@ -121,7 +120,7 @@ class CommentPostTasksHandler(webapp2.RequestHandler):
         
 class DeletePostHandler(webapp2.RequestHandler):
     def post(self):
-        Post.delete_post(int(self.request.get('post_id')))
+        Post.delete_post(str(self.request.get('post_key')))
         self.response.write('Post successfully deleted')
         
 class AddFriendTasksHandler(webapp2.RequestHandler):
@@ -130,8 +129,8 @@ class AddFriendTasksHandler(webapp2.RequestHandler):
         task = taskqueue.add(
             url='/tasks/addFriend',
             target='worker',
-            params={'friend_id': str(self.request.get('friend_id')),
-                    'user_id': str(self.request.get('user_id'))
+            params={'friend_key': str(self.request.get('friend_key')),
+                    'user_key': str(self.request.get('user_key'))
                              })
         #Should be a response to the user that says, they have liked the post
         self.response.write(
@@ -143,13 +142,21 @@ class RequestFriendTaksHandler(webapp2.RequestHandler):
         task = taskqueue.add(
             url='/tasks/requestFriend',
             target='worker',
-            params={'user_id': str(self.request.get('user_id')),
-                    'friend_id': str(self.request.get('friend_id'))
+            params={'user_key': str(self.request.get('user_key')),
+                    'friend_key': str(self.request.get('friend_key'))
                              })
         #Should be a response to the user that says, they have liked the post
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+
+class UnfriendHanlder(webapp2.RequestHandler):
+    def post(self):
+        pass
+
+class RemoveRequestHandler(webapp2.RequestHandler):
+    def post(self):
         
+        pass
         
         
 
@@ -165,5 +172,7 @@ app = webapp2.WSGIApplication([
     ('/api/updateUser', UpdateUserHandler),
     ('/api/deletePost', DeletePostHandler),
     ('/api/addFriend', AddFriendTasksHandler),
-    ('/api/requestFriend', RequestFriendTaksHandler)
+    ('/api/requestFriend', RequestFriendTaksHandler),
+    ('/api/unfriend', UnfriendHanlder),
+    ('/api/removeRequest', RemoveRequestHandler)
 ], debug=True)

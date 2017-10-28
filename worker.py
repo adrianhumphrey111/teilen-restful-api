@@ -11,16 +11,15 @@ import webapp2
 
 class LikeMediaPostHandler(webapp2.RequestHandler):
     def post(self):
-        user_id = int(self.request.get('user_id'))
-        post_id = int(self.request.get('post_id'))
-        like = Like(user_key=ndb.Key('User', user_id), post_key=ndb.Key('Post', post_id)).put()
+        user_key = str(self.request.get('user_key'))
+        post_key = str(self.request.get('post_key'))
+        Like(user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key)).put()
 
- 
 class CreatePostHandler(webapp2.RequestHandler):
     def post(self):
-        user_id=int(self.request.get('user_id'))
+        user_key=str(self.request.get('user_key'))
         post_text=str(self.request.get('post_text'))
-        post = Post.create_post(user_id=user_id, text=post_text)
+        post = Post.create_post(user_key=user_key, text=post_text)
         self.response.write('This is the response from creating post')
         
 class CreateUserHandler(webapp2.RequestHandler):
@@ -33,21 +32,19 @@ class CreateUserHandler(webapp2.RequestHandler):
         
 class CommentPostHandler(webapp2.RequestHandler):
     def post(self):
-        user_id = int(self.request.get('user_id'))
-        post_id = int(self.request.get('post_id'))
+        user_key = str(self.request.get('user_key'))
+        post_key = str(self.request.get('post_key'))
         comment_text = str(self.request.get('comment'))
-        comment = Comment(user_key=ndb.Key('User', user_id), post_key=ndb.Key('Post', post_id), text=comment_text).put()
-            
-
+        comment = Comment(user_key=ndb.Key('User', user_key), post_key=ndb.Key('Post', post_key), text=comment_text).put()
+        
 class AddFriendHandler(webapp2.RequestHandler):
     def post(self):
-        User.add_friend( key=ndb.Key( 'User', int(self.request.get('user_id'))), friend_id=int(self.request.get('friend_id')))
+        User.add_friend( user_url_key=str(self.request.get('user_key')), friend_url_key=str(self.request.get('friend_key')))
         
         
 class RequestFriendHandler(webapp2.RequestHandler):
     def post(self):
-        User.request_friend(key=ndb.Key( 'User', int(self.request.get('user_id'))), friend_key=ndb.Key( 'User', int(self.request.get('friend_id'))))
-        
+        User.request_friend( user_url_key=str(self.request.get('user_key')), friend_url_key=str(self.request.get('friend_key')))
         
         
 app = webapp2.WSGIApplication([
