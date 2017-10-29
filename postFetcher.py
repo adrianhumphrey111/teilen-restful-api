@@ -9,9 +9,9 @@ from google.appengine.ext import ndb
 
 
 class PostFetcher:
-    def __init__(self, user_id):
-        self.key = ndb.Key('User', user_id)
-        self.user_id = user_id
+    def __init__(self, user_key):
+        self.key = ndb.Key(urlsafe=user_key)
+        self.user_id = self.key.id()
         self.user = self.key.get()
         self.posts = []
         self.users = []

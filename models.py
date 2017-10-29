@@ -14,7 +14,7 @@ class Car(ndb.Model):
     model = ndb.StringProperty()
     year = ndb.IntegerProperty()
     make = ndb.StringProperty()
-    miles_per_gallon = ndb.IntegerProperty()
+    miles_per_gallon = ndb.FloatProperty()
     num_of_trips = ndb.IntegerProperty()
     num_of_seats = ndb.IntegerProperty()
     
@@ -30,9 +30,6 @@ class TripStatus(ndb.Model):
     LOOKING = "Looking For Passengers"
     BOOKED = "Trip Not Started But Full"
     COMPLETED = "Trip Has Been Completed"
-
-
-
     
 class Trip(ndb.Model):
     start_time = ndb.DateTimeProperty()
@@ -97,12 +94,12 @@ class User(ndb.Model):
         posts = []
         for post in Post.query(Post.user_key == key).fetch():
             post_key = post.key.urlsafe()
-            user_id = post.user_key.id()
+            user_key = post.user_key.urlsafe()
             post=post.to_dict()
             post.pop('user_key', None)
             post['user'] = self.user_for_app( key.get().to_dict() )
             post['post_key'] = post_key
-            post['user']['user_id'] = user_id
+            post['user']['user_key'] = user_key
             posts.append( post )
         return posts
 

@@ -70,7 +70,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
 class FetchPostsHandler(webapp2.RequestHandler):
     def get(self):
         #return a fetch object with all posts and appropriate things needed for the app to populate
-        feed = PostFetcher(user_key=int(self.request.get('user_key')))
+        feed = PostFetcher(user_key=str(self.request.get('user_key')))
         posts = feed.get_all_posts()
         self.response.headers['Content-Type'] = 'application/json'  
         obj = {'feed': posts } 
