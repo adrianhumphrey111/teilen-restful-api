@@ -54,6 +54,19 @@ class LikePostTaskHandler(webapp2.RequestHandler):
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
         
+class UnLikePostTaskHandler(webapp2.RequestHandler):
+    def post(self):
+        task = taskqueue.add(
+            url='/tasks/unlikePost',
+            target='worker',
+            params={'user_key': str(self.request.get('user_key')),
+                    'post_key': str(self.request.get('post_key'))})
+        
+        #Should be a response to the user that says, they have liked the post
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        
+        
 class CreateMediaPostTaskHandler(webapp2.RequestHandler):
     def post(self):
         
@@ -74,7 +87,7 @@ class FetchPostsHandler(webapp2.RequestHandler):
         posts = feed.get_all_posts()
         self.response.headers['Content-Type'] = 'application/json'  
         obj = {'feed': posts } 
-        self.response.out.write(json.dumps(obj, default=json_handler)) 
+        self.response.out.write(json.dumps([post for post in posts], default=json_handler)) 
         
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
@@ -165,6 +178,7 @@ app = webapp2.WSGIApplication([
     ('/api/login', LoginHandler),
     ('/api/search', SearchHandler),
     ('/api/likePost', LikePostTaskHandler),
+    ('/api/unlikePost', UnLikePostTaskHandler),
     ('/api/commentPost', CommentPostTasksHandler),
     ('/api/createPost', CreateMediaPostTaskHandler),
     ('/api/fetchPost', FetchPostsHandler),

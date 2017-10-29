@@ -20,9 +20,13 @@ class PostFetcher:
     
     def add_friends(self):
         self.users.append( self.user ) #add the user, self, to the post to fetch
-        if hasattr(self.user, 'friends_ids'): #the user has atleast one friend
+        print self.user
+        if hasattr(self.user, 'friend_ids'): #the user has atleast one friend
+            print 'This user has friends'
             for friend_id in self.user.friend_ids:
                 self.users.append( ndb.Key('User', friend_id).get() )
+        else:
+            print 'This user does not have friends'
             
     def addAllPosts(self):
         for user in self.users:

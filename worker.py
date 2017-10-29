@@ -14,6 +14,13 @@ class LikeMediaPostHandler(webapp2.RequestHandler):
         user_key = str(self.request.get('user_key'))
         post_key = str(self.request.get('post_key'))
         Like(user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key)).put()
+        
+class UnLikeMediaPostHandler(webapp2.RequestHandler):
+    def post(self):
+        user_key = str(self.request.get('user_key'))
+        post_key = str(self.request.get('post_key'))
+        Like.delete_like(post_key=post_key, user_key=user_key)
+        
 
 class CreatePostHandler(webapp2.RequestHandler):
     def post(self):
@@ -49,6 +56,7 @@ class RequestFriendHandler(webapp2.RequestHandler):
         
 app = webapp2.WSGIApplication([
     ('/tasks/likePost', LikeMediaPostHandler),
+    ('/tasks/unlikePost', UnLikeMediaPostHandler),
     ('/tasks/commentPost', CommentPostHandler),
     ('/tasks/createPost', CreatePostHandler),
     ('/tasks/createUser', CreateUserHandler),

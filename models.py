@@ -1,6 +1,7 @@
 from google.appengine.ext import ndb
 from protorpc import messages
 from google.appengine.ext.ndb import msgprop
+from google.appengine.ext.db import IntegerProperty
 
 
 class Location(ndb.Model):
@@ -95,11 +96,15 @@ class User(ndb.Model):
         for post in Post.query(Post.user_key == key).fetch():
             post_key = post.key.urlsafe()
             user_key = post.user_key.urlsafe()
+            like_count = Post.get_like_count( post_key )
+            comment_count = Post.get_comment_count( post_key )
             post=post.to_dict()
             post.pop('user_key', None)
             post['user'] = self.user_for_app( key.get().to_dict() )
             post['post_key'] = post_key
             post['user']['user_key'] = user_key
+            post['like_count'] = like_count
+            post['comment_count'] = comment_count
             posts.append( post )
         return posts
 
@@ -171,6 +176,8 @@ class Post(ndb.Model):
     user_key = ndb.KeyProperty(kind=User)
     user = ndb.StructuredProperty(User)
     text = ndb.StringProperty()
+    likeCount = IntegerProperty()
+    commentCount = IntegerProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True) 
     
     @classmethod
@@ -178,11 +185,22 @@ class Post(ndb.Model):
         user_key = ndb.Key(urlsafe=user_key)
         post = Post(user_key=user_key, text=text).put()
         return post
+    
+    @classmethod
+    def get_like_count(cls, post_key):
+        #Query all likes associated with post
+        return len( Like.query(Like.post_key == ndb.Key(urlsafe=post_key) ).fetch() )
+    
+    @classmethod
+    def get_comment_count(cls, post_key):
+        #Query all likes associated with post
+        return len( Comment.query(Comment.post_key == ndb.Key(urlsafe=post_key) ).fetch() )
 
     @classmethod
     def delete_post(cls, post_key):
         key = ndb.Key(urlsafe=post_key)
         key.delete()
+        
         
 class Comment(ndb.Model):
     user_key = ndb.KeyProperty(kind=User)
@@ -200,6 +218,13 @@ class Like(ndb.Model):
     post_key = ndb.KeyProperty(kind=Post)
     comment_key = ndb.KeyProperty(kind=Comment)
     created_at = ndb.DateTimeProperty(auto_now_add=True)
+    
+    @classmethod
+    def delete_like(cls, post_key, user_key):
+        post_key = ndb.Key(urlsafe=post_key)
+        user_key = ndb.Key(urlsafe=user_key)
+        for like in Like.query(ndb.AND(Like.post_key == post_key, Like.user_key == user_key)).fetch():
+            like.key.delete()
     
     
 class Rating(ndb.Model):
