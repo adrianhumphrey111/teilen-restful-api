@@ -97,6 +97,7 @@ class User(ndb.Model):
             post_key = post.key.urlsafe()
             user_key = post.user_key.urlsafe()
             like_count = Post.get_like_count( post_key )
+            user_liked = Post.check_user_liked( user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key) )
             comment_count = Post.get_comment_count( post_key )
             post=post.to_dict()
             post.pop('user_key', None)
@@ -105,6 +106,7 @@ class User(ndb.Model):
             post['user']['user_key'] = user_key
             post['like_count'] = like_count
             post['comment_count'] = comment_count
+            post['user_liked'] = user_liked
             posts.append( post )
         return posts
 
@@ -176,8 +178,9 @@ class Post(ndb.Model):
     user_key = ndb.KeyProperty(kind=User)
     user = ndb.StructuredProperty(User)
     text = ndb.StringProperty()
-    likeCount = IntegerProperty()
-    commentCount = IntegerProperty()
+    likeCount = ndb.IntegerProperty()
+    commentCount = ndb.IntegerProperty()
+    user_liked = ndb.BooleanProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True) 
     
     @classmethod
@@ -185,6 +188,13 @@ class Post(ndb.Model):
         user_key = ndb.Key(urlsafe=user_key)
         post = Post(user_key=user_key, text=text).put()
         return post
+    
+    @classmethod
+    def check_user_liked(cls, user_key, post_key):
+        if len( Like.query(ndb.AND(Like.post_key == post_key, Like.user_key == user_key)).fetch() ) > 0:
+            return True
+        else:
+            return False
     
     @classmethod
     def get_like_count(cls, post_key):

@@ -51,6 +51,7 @@ class LikePostTaskHandler(webapp2.RequestHandler):
                     'post_key': str(self.request.get('post_key'))})
         
         #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
         
@@ -63,6 +64,7 @@ class UnLikePostTaskHandler(webapp2.RequestHandler):
                     'post_key': str(self.request.get('post_key'))})
         
         #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
         
@@ -77,6 +79,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
                     'post_text': str(self.request.get('post_text'))
                              })
         #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
         
@@ -99,6 +102,7 @@ class UpdateUserHandler(webapp2.RequestHandler):
             target='worker',
             params=params)
         #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
     
@@ -114,6 +118,7 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
                     'email': str(self.request.get('email'))
                              })
         #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
         
@@ -128,12 +133,14 @@ class CommentPostTasksHandler(webapp2.RequestHandler):
                     'comment': str(self.request.get('comment'))
                              })
         #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
         
 class DeletePostHandler(webapp2.RequestHandler):
     def post(self):
         Post.delete_post(str(self.request.get('post_key')))
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write('Post successfully deleted')
         
 class AddFriendTasksHandler(webapp2.RequestHandler):
@@ -146,6 +153,7 @@ class AddFriendTasksHandler(webapp2.RequestHandler):
                     'user_key': str(self.request.get('user_key'))
                              })
         #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
         
@@ -159,6 +167,7 @@ class RequestFriendTaksHandler(webapp2.RequestHandler):
                     'friend_key': str(self.request.get('friend_key'))
                              })
         #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
 
