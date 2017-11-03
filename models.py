@@ -83,12 +83,14 @@ class User(ndb.Model):
         return user.put()
     
     @classmethod
-    def updateUser(self, key, **kwargs):
-        user = key.get()
-        for key in kwargs:
+    def updateUser(self, **kwargs):
+        print str( kwargs )
+        '''for key in kwargs:
+            print key
+            print kwargs[key]
             #update any value that is in kwargs
             setattr(user, key, kwargs[key])
-        return user.put()
+        return user.put()'''
     
     @classmethod
     def retrieve_all_post(self, key):

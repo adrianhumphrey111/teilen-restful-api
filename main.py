@@ -18,7 +18,7 @@ import webapp2
 from google.appengine.ext import ndb
 import google
 from google.appengine.api import taskqueue
-from models import Post, User
+from models import Post, User, Comment
 from postFetcher import PostFetcher
 import json
 import datetime
@@ -89,22 +89,16 @@ class FetchPostsHandler(webapp2.RequestHandler):
         feed = PostFetcher(user_key=str(self.request.get('user_key')))
         posts = feed.get_all_posts()
         self.response.headers['Content-Type'] = 'application/json'  
-        obj = {'feed': posts } 
         self.response.out.write(json.dumps([post for post in posts], default=json_handler)) 
         
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
         params = self.request.get('update_dict')
-        
-        #Add this task to create User to the task queue
-        task = taskqueue.add(
-            url='/tasks/updateUser',
-            target='worker',
-            params=params)
-        #Should be a response to the user that says, they have liked the post
-        self.response.headers['Content-Type'] = 'application/json'
-        self.response.write(
-            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        user_key = self.request.get('user_key')
+        obj = json.loads(params)
+        obj.user_key = user_key
+        User.updateUser(self, params)
+        self.response.out.write("Updated User")
     
 
 class CreateUserTasksHandler(webapp2.RequestHandler):
@@ -124,18 +118,21 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
         
 class CommentPostTasksHandler(webapp2.RequestHandler):
     def post(self):
-        #Add this task to create User to the task queue
-        task = taskqueue.add(
-            url='/tasks/commentPost',
-            target='worker',
-            params={'user_key': str(self.request.get('user_key')),
-                    'post_key': str(self.request.get('post_key')),
-                    'comment': str(self.request.get('comment'))
-                             })
+        user_key = str(self.request.get('user_key'))
+        post_key = str(self.request.get('post_key'))
+        comment_text = str(self.request.get('comment'))
+        urlsafe_comment_key = Comment(user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key), text=comment_text).put().urlsafe()
+        comment = ndb.Key(urlsafe=urlsafe_comment_key).get()
+        user_key_urlsafe = comment.user_key.urlsafe()
+        post_key_urlsafe = comment.post_key.urlsafe()
+        comment = comment.to_dict()
+        comment['user_key'] = user_key_urlsafe
+        comment['post_key'] = post_key_urlsafe
+        comment['comment_key'] = urlsafe_comment_key
+        
         #Should be a response to the user that says, they have liked the post
-        self.response.headers['Content-Type'] = 'application/json'
-        self.response.write(
-            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        obj = {'comment': comment}
+        self.response.write(json.dumps(obj , default=json_handler) )
         
 class DeletePostHandler(webapp2.RequestHandler):
     def post(self):

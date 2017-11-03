@@ -42,7 +42,7 @@ class CommentPostHandler(webapp2.RequestHandler):
         user_key = str(self.request.get('user_key'))
         post_key = str(self.request.get('post_key'))
         comment_text = str(self.request.get('comment'))
-        comment = Comment(user_key=ndb.Key('User', user_key), post_key=ndb.Key('Post', post_key), text=comment_text).put()
+        comment = Comment(user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key), text=comment_text).put()
         
 class AddFriendHandler(webapp2.RequestHandler):
     def post(self):
@@ -52,6 +52,7 @@ class AddFriendHandler(webapp2.RequestHandler):
 class RequestFriendHandler(webapp2.RequestHandler):
     def post(self):
         User.request_friend( user_url_key=str(self.request.get('user_key')), friend_url_key=str(self.request.get('friend_key')))
+        
         
         
 app = webapp2.WSGIApplication([
