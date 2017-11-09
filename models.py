@@ -10,6 +10,8 @@ class Location(ndb.Model):
     city = ndb.StringProperty()
     state = ndb.StringProperty()
     country = ndb.StringProperty()
+    address1 = ndb.StringProperty()
+    address2 = ndb.StringProperty()
     
 class Car(ndb.Model):
     model = ndb.StringProperty()
@@ -35,9 +37,9 @@ class TripStatus(ndb.Model):
 class Trip(ndb.Model):
     start_time = ndb.DateTimeProperty()
     end_time = ndb.DateTimeProperty()
-    start_location = ndb.StringProperty()
-    end_location = ndb.StringProperty()
-    driver_id = ndb.IntegerProperty()
+    start_location = ndb.StructuredProperty( Location )
+    end_location = ndb.StructuredProperty( Location )
+    driver_key = ndb.IntegerProperty()
     passenger_ids = ndb.IntegerProperty(repeated=True)
     seats = ndb.IntegerProperty()
     seats_avialble = ndb.IntegerProperty()
@@ -95,6 +97,7 @@ class User(ndb.Model):
     @classmethod
     def retrieve_all_post(self, key):
         posts = []
+        print key
         for post in Post.query(Post.user_key == key).fetch():
             post_key = post.key.urlsafe()
             user_key = post.user_key.urlsafe()
@@ -180,16 +183,19 @@ class Post(ndb.Model):
     user_key = ndb.KeyProperty(kind=User)
     user = ndb.StructuredProperty(User)
     text = ndb.StringProperty()
+    trip_key = ndb.KeyProperty(kind=Trip)
     likeCount = ndb.IntegerProperty()
     commentCount = ndb.IntegerProperty()
     user_liked = ndb.BooleanProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True) 
     
     @classmethod
-    def create_post(cls, user_key, text):
+    def create_post(cls, user_key, text, trip_key):
         user_key = ndb.Key(urlsafe=user_key)
-        post = Post(user_key=user_key, text=text).put()
-        return post
+        post = Post(user_key=user_key, text=text)
+        post.trip_key = trip_key
+        post_key = post.put()
+        return post_key
     
     @classmethod
     def check_user_liked(cls, user_key, post_key):
