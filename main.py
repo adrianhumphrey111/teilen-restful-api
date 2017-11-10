@@ -102,16 +102,29 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         
         #Create the Trip to be associated with the post
         trip_key = Trip(start_location=start_location, end_location=end_location).put()
-
-        post = Post.create_post(user_key=user_key, text=post_text, trip_key=trip_key)
+        post_key = Post.create_post(user_key=user_key, text=post_text, trip_key=trip_key)
         
-class FetchPostsHandler(webapp2.RequestHandler):
+        #SEnd Response
+        self.response.headers['Content-Type'] = 'application/json' 
+        obj = {'post_key': post_key,
+               'trip_key': trip_key}
+        self.response.write(json.dumps(obj , default=json_handler) )
+        
+class FetchFeedHandler(webapp2.RequestHandler):
     def get(self):
         #return a fetch object with all posts and appropriate things needed for the app to populate
         feed = PostFetcher(user_key=str(self.request.get('user_key')))
         posts = feed.get_all_posts()
         self.response.headers['Content-Type'] = 'application/json'  
-        self.response.out.write(json.dumps([post for post in posts], default=json_handler)) 
+        self.response.out.write(json.dumps([post for post in posts], default=json_handler))
+        
+class FetchUserFeedHandler(webapp2.RequestHandler):
+    def get(self):
+        #return a fetch object with all posts and appropriate things needed for the app to populate
+        feed = PostFetcher(user_key=str(self.request.get('user_key')))
+        posts = feed.get_all_user_posts()
+        self.response.headers['Content-Type'] = 'application/json'  
+        self.response.out.write(json.dumps([post for post in posts], default=json_handler))  
         
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
@@ -209,7 +222,8 @@ app = webapp2.WSGIApplication([
     ('/api/unlikePost', UnLikePostTaskHandler),
     ('/api/commentPost', CommentPostTasksHandler),
     ('/api/createPost', CreateMediaPostTaskHandler),
-    ('/api/fetchPost', FetchPostsHandler),
+    ('/api/fetchFeed', FetchFeedHandler),
+    ('/api/fetchUserFeed', FetchUserFeedHandler),
     ('/api/createUser', CreateUserTasksHandler),
     ('/api/updateUser', UpdateUserHandler),
     ('/api/deletePost', DeletePostHandler),

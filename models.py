@@ -104,7 +104,11 @@ class User(ndb.Model):
             like_count = Post.get_like_count( post_key )
             user_liked = Post.check_user_liked( user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key) )
             comment_count = Post.get_comment_count( post_key )
-            trip = post.trip_key.get().to_dict()
+            trip = None
+            if post.trip_key.get() != None:
+                trip = post.trip_key.get().to_dict()
+            else:
+                trip = ""
             post=post.to_dict()
             post.pop('user_key', None)
             post['user'] = self.user_for_app( key.get().to_dict() )

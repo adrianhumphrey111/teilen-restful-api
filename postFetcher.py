@@ -15,6 +15,7 @@ class PostFetcher:
         self.user = ndb.Key(urlsafe=user_key).get()
         self.posts = []
         self.users = []
+        self.user_posts = []
         self.add_friends()
         self.addAllPosts()
     
@@ -46,6 +47,12 @@ class PostFetcher:
         
     def get_all_posts(self):
         return self.posts
+    
+    def get_all_user_posts(self):
+        for post in User.retrieve_all_post( self.key ):
+            post['comments'] = self.get_post_comments(post_key=post['post_key'])
+            self.user_posts.append( post )
+        return self.user_posts
     
     
         
