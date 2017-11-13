@@ -51,7 +51,10 @@ class User(ndb.Model):
     last_name = ndb.StringProperty()
     email = ndb.StringProperty()
     school = ndb.StringProperty()
+    salt = ndb.StringProperty()
+    hashed_password = ndb.StringProperty()
     location = ndb.StructuredProperty(Location)
+    facebook_id = ndb.StringProperty()
     car = ndb.StructuredProperty(Car)
     status = ndb.StructuredProperty(UserStatus)
     billing_info = ndb.StringProperty()
@@ -60,6 +63,7 @@ class User(ndb.Model):
     current_trip_id = ndb.StructuredProperty(Trip)
     planned_trip_ids = ndb.IntegerProperty(repeated=True)
     completed_trip_ids = ndb.IntegerProperty(repeated=True)
+    numberOfCompletedTrips = ndb.IntegerProperty()
     rating = ndb.FloatProperty()
     post_ids = ndb.IntegerProperty(repeated=True) #one to many relationship 
     friend_ids = ndb.IntegerProperty(repeated=True)
@@ -67,21 +71,25 @@ class User(ndb.Model):
     requested_friend_ids = ndb.IntegerProperty(repeated=True)
     
     @classmethod
-    def create_new_user(self, **kwargs):
+    def create_new_user(self, first_name, last_name, email, profile_pic_url, facebook_id, hashed_password, salt):
         user = User()
-        for key in kwargs:
-            #update any value that is in kwargs
-            setattr(user, key, kwargs[key])
+        user.first_name = first_name
+        user.last_name = last_name
+        user.email = email
+        user.facebook_id = facebook_id
+        user.profile_pic_url = profile_pic_url
+        user.hashed_password = hashed_password
+        user.salt = salt
         user.friend_ids = []
         user.post_ids = []
         user.reviews = []
         user.rating = 5
+        user.numberOfCompletedTrips = 0
         user.completed_trip_ids = []
         user.planned_trip_ids = []
         user.friend_request_ids = []
         user.requested_friend_ids = []
         user.current_trip_id = None
-        
         return user.put()
     
     @classmethod

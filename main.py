@@ -22,6 +22,7 @@ from models import Post, User, Comment, Location, Trip
 from postFetcher import PostFetcher
 import json
 import datetime
+import hashlib, uuid
 
 def json_handler(x):
     if isinstance(x, datetime.datetime):
@@ -35,8 +36,36 @@ class MainHandler(webapp2.RequestHandler):
         self.response.write('Hello world!')
         
 class LoginHandler(webapp2.RequestHandler):
-    def post(self):
-        self.response.write('You have been logged in')
+    def get(self):
+        params = self.request.params
+        email = params['email']
+        password = params['password']
+        
+        #Set Header
+        self.response.headers['Content-Type'] = 'application/json' 
+        
+        '''Retrieve user by email'''
+        users = User.query( User.email == email ).fetch()
+        if len( users ) > 0:
+            for user in users:
+                '''Hash the password'''
+                salt = user.salt
+                hashed_password = hashlib.sha512(password + salt).hexdigest()
+                if user.hashed_password == hashed_password:
+                    '''This is a matching password and user is authenticated'''
+                    #SEnd Response
+                    
+                    obj = {'result': True}
+                    self.response.write(json.dumps(obj , default=json_handler) )
+                else:
+                    obj = {'result': False,
+                           'error': 'Wrong Password'}
+                    self.response.write(json.dumps(obj , default=json_handler) )
+        else:
+            obj = {'result': False,
+                   'error': 'No matching Email'}
+            self.response.write(json.dumps(obj , default=json_handler) )     
+            
         
 class SearchHandler(webapp2.RequestHandler):
     def post(self):
@@ -128,28 +157,59 @@ class FetchUserFeedHandler(webapp2.RequestHandler):
         
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
-        params = self.request.get('update_dict')
+        params = self.request.params
         user_key = self.request.get('user_key')
-        obj = json.loads(params)
-        obj.user_key = user_key
+        
+
         User.updateUser(self, params)
         self.response.out.write("Updated User")
     
 
 class CreateUserTasksHandler(webapp2.RequestHandler):
     def post(self):
-        #Add this task to create User to the task queue
-        task = taskqueue.add(
-            url='/tasks/createUser',
-            target='worker',
-            params={'first_name': str(self.request.get('first_name')),
-                    'last_name': str(self.request.get('last_name')),
-                    'email': str(self.request.get('email'))
-                             })
-        #Should be a response to the user that says, they have liked the post
+        params = self.request.params
+        print 'Params => ' + str(params)
+        '''Create User'''
+        first_name = params['user[first_name]']
+        last_name = params['user[last_name]']
+        email = params['user[email]']
+        facebook_id = params['user[facebook_id]']
+        profile_pic_url = params['user[profile_pic_url]']
+        password = params['user[password]']
+        
+        '''Hash The password'''
+        salt = uuid.uuid4().hex
+        hashed_password = hashlib.sha512(password + salt).hexdigest()
+        
+        '''Check if this user already exist through facebook or email''' 
+        '''TODO CHANGE FACEBOOK ID SO IT IS NOT '' SO IT CAN BE COMPARED'''
+        users = []
+        if facebook_id == '':
+            '''This user signed up with their email.'''
+            users = User.query( User.email == email ).fetch()
+        else:
+            '''This user signed up with facebook.'''
+            users = User.query( User.facebook_id == facebook_id ).fetch()
+        user_key = ''
+        returned_user = None
+        for user in users:
+            print user
+            returned_user = user
+        if len( users ) == 0:
+            user_key = User.create_new_user(first_name=first_name, 
+                                            last_name=last_name, 
+                                            email=email, 
+                                            profile_pic_url=profile_pic_url, 
+                                            facebook_id=facebook_id,
+                                            hashed_password=hashed_password,
+                                            salt=salt)
+            user_key = user_key.urlsafe()
+        else:
+            user_key = returned_user.key.urlsafe()
+        obj = {'user_key' : user_key}
         self.response.headers['Content-Type'] = 'application/json'
-        self.response.write(
-            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        self.response.write(json.dumps(obj , default=json_handler) )
+
         
 class CommentPostTasksHandler(webapp2.RequestHandler):
     def post(self):
