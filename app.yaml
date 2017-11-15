@@ -8,12 +8,30 @@ handlers:
 - url: /favicon\.ico
   static_files: favicon.ico
   upload: favicon\.ico
+  
+- url: /
+  static_files: www/index.html
+  upload: www/index.html
 
 - url: /api/.*
   script: main.app
   
 - url: /tasks/.*
   script: worker.app
+  
+- url: /css
+  static_dir: www/css
+  
+- url: /img
+  static_dir: www/img
+  
+- url: /js
+  static_dir: www/js
+  
+- url: /fonts
+  static_dir: www/fonts
+  
+
   
 
 libraries:
