@@ -23,6 +23,11 @@ from postFetcher import PostFetcher
 import json
 import datetime
 import hashlib, uuid
+from payment import Payment
+import stripe
+import config
+
+stripe.api_key = config.stripe_api_key_secret
 
 def json_handler(x):
     if isinstance(x, datetime.datetime):
@@ -53,9 +58,14 @@ class LoginHandler(webapp2.RequestHandler):
                 hashed_password = hashlib.sha512(password + salt).hexdigest()
                 if user.hashed_password == hashed_password:
                     '''This is a matching password and user is authenticated'''
-                    #SEnd Response
-                    
-                    obj = {'result': True}
+                    #Send Response
+                    stripe_account_id = user.stripe_account_id
+                    user_key = user.key.urlsafe()
+                    user = user.to_dict()
+                    user['user_key'] = user_key
+                    user['stripe_account_id'] = stripe_account_id
+                    obj = {'result': True,
+                           'user' : user}
                     self.response.write(json.dumps(obj , default=json_handler) )
                 else:
                     obj = {'result': False,
@@ -177,6 +187,11 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
         profile_pic_url = params['user[profile_pic_url]']
         password = params['user[password]']
         
+        '''Stripe User'''
+        new_stripe_user = None
+        stripe_account_id = ""
+        stripe_customer_id = ""
+        
         '''Hash The password'''
         salt = uuid.uuid4().hex
         hashed_password = hashlib.sha512(password + salt).hexdigest()
@@ -195,18 +210,32 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
         for user in users:
             print user
             returned_user = user
+            
+            '''Create a stripe account for this user'''
+            new_stripe_user = Payment(first_name=first_name, last_name=last_name, email=email)
+            stripe_customer_id = new_stripe_user.createCustomer()
+            stripe_account_id = new_stripe_user.createUser()
+            
         if len( users ) == 0:
+            '''Save User to the databases'''
             user_key = User.create_new_user(first_name=first_name, 
                                             last_name=last_name, 
                                             email=email, 
                                             profile_pic_url=profile_pic_url, 
                                             facebook_id=facebook_id,
                                             hashed_password=hashed_password,
-                                            salt=salt)
+                                            salt=salt,
+                                            stripe_account_id=stripe_account_id,
+                                            customer_id=stripe_customer_id)
             user_key = user_key.urlsafe()
         else:
             user_key = returned_user.key.urlsafe()
-        obj = {'user_key' : user_key}
+        
+        
+        obj = {'user_key' : user_key,
+               'stripe_account_id': stripe_account_id,
+               'customer_id': stripe_customer_id}
+        
         self.response.headers['Content-Type'] = 'application/json'
         self.response.write(json.dumps(obj , default=json_handler) )
 
@@ -271,8 +300,30 @@ class RemoveRequestHandler(webapp2.RequestHandler):
     def post(self):
         
         pass
+    
+class CreateStripeUser(webapp2.RequestHandler):
+    def post(self):
+        user = Payment(email="adrianhumphrey374@gmail.com")
+        pass
+    
+class DeleteStripeUser(webapp2.RequestHandler):
+    def post(self):
+        user = Payment(email="adrian@questornow.com")
+        pass
+    
+class StripeTempKeyHandler(webapp2.RequestHandler):
+    def post(self):
+        params = self.request.params
+        customer_id = params['customer_id']
+        api_version = params['api_version']
+       
+        stripe.api_key = config.stripe_api_key_secret
+        key = stripe.EphemeralKey.create(customer=customer_id, api_version=api_version)
         
-        
+        #Return json key
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.write(json.dumps(key , default=json_handler) )
+       
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
@@ -285,8 +336,10 @@ app = webapp2.WSGIApplication([
     ('/api/fetchFeed', FetchFeedHandler),
     ('/api/fetchUserFeed', FetchUserFeedHandler),
     ('/api/createUser', CreateUserTasksHandler),
+    ('/api/ephemeral_keys', StripeTempKeyHandler),
     ('/api/updateUser', UpdateUserHandler),
     ('/api/deletePost', DeletePostHandler),
+    ('/api/createStripeUser', CreateStripeUser),
     ('/api/addFriend', AddFriendTasksHandler),
     ('/api/requestFriend', RequestFriendTaksHandler),
     ('/api/unfriend', UnfriendHanlder),

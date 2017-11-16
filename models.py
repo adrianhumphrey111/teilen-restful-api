@@ -53,6 +53,8 @@ class User(ndb.Model):
     school = ndb.StringProperty()
     salt = ndb.StringProperty()
     hashed_password = ndb.StringProperty()
+    stripe_account_id = ndb.StringProperty()
+    customer_id = ndb.StringProperty()
     location = ndb.StructuredProperty(Location)
     facebook_id = ndb.StringProperty()
     car = ndb.StructuredProperty(Car)
@@ -71,7 +73,7 @@ class User(ndb.Model):
     requested_friend_ids = ndb.IntegerProperty(repeated=True)
     
     @classmethod
-    def create_new_user(self, first_name, last_name, email, profile_pic_url, facebook_id, hashed_password, salt):
+    def create_new_user(self, first_name, last_name, email, profile_pic_url, facebook_id, hashed_password, salt, stripe_account_id, customer_id):
         user = User()
         user.first_name = first_name
         user.last_name = last_name
@@ -79,6 +81,8 @@ class User(ndb.Model):
         user.facebook_id = facebook_id
         user.profile_pic_url = profile_pic_url
         user.hashed_password = hashed_password
+        user.stripe_account_id = stripe_account_id
+        user.customer_id=customer_id
         user.salt = salt
         user.friend_ids = []
         user.post_ids = []
@@ -187,6 +191,7 @@ class User(ndb.Model):
         user.pop('email', None)
         user.pop('billing_info', None)
         user.pop('post_ids', None)
+        user.pop('stripe_account_id', None)
         user.pop('friend_ids', None)
         user.pop('friend_request_ids', None)
         user.pop('requested_friend_ids', None)
