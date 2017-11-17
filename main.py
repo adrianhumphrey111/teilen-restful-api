@@ -24,6 +24,7 @@ import json
 import datetime
 import hashlib, uuid
 from payment import Payment
+from notificationManager import Notification
 import stripe
 import config
 
@@ -323,6 +324,22 @@ class StripeTempKeyHandler(webapp2.RequestHandler):
         #Return json key
         self.response.headers['Content-Type'] = 'application/json'
         self.response.write(json.dumps(key , default=json_handler) )
+
+class NotificationTaskHandler(webapp2.RequestHandler):
+    def post(self):
+        # Add this task to add friend to list of friends
+        task = taskqueue.add(
+            url='/tasks/handleNotification',
+            target='worker',
+            params={'to_key': str(self.request.get('to_key')),
+                    'from_key': str(self.request.get('from_key')),
+                    'type' : str(self.request.get('type'))
+                    })
+        # Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+
        
 
 app = webapp2.WSGIApplication([
@@ -335,6 +352,7 @@ app = webapp2.WSGIApplication([
     ('/api/createPost', CreateMediaPostTaskHandler),
     ('/api/fetchFeed', FetchFeedHandler),
     ('/api/fetchUserFeed', FetchUserFeedHandler),
+    ('/api/handleNotification', NotificationTaskHandler),
     ('/api/createUser', CreateUserTasksHandler),
     ('/api/ephemeral_keys', StripeTempKeyHandler),
     ('/api/updateUser', UpdateUserHandler),
