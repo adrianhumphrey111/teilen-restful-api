@@ -77,7 +77,7 @@ class User(ndb.Model):
     requested_friend_ids = ndb.IntegerProperty(repeated=True)
     
     @classmethod
-    def create_new_user(self, first_name, last_name, email, profile_pic_url, facebook_id, hashed_password, salt, stripe_account_id, customer_id):
+    def create_new_user(self, first_name, last_name, email, profile_pic_url, facebook_id, hashed_password, salt, stripe_account_id, customer_id, notification_token):
         user = User()
         user.first_name = first_name
         user.last_name = last_name
@@ -85,6 +85,7 @@ class User(ndb.Model):
         user.facebook_id = facebook_id
         user.profile_pic_url = profile_pic_url
         user.hashed_password = hashed_password
+        user.notification_token = notification_token
         user.stripe_account_id = stripe_account_id
         user.customer_id=customer_id
         user.salt = salt

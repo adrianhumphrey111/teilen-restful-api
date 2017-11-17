@@ -187,6 +187,7 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
         facebook_id = params['user[facebook_id]']
         profile_pic_url = params['user[profile_pic_url]']
         password = params['user[password]']
+        not_token = params['user[notification_token]']
         
 
         '''Create a stripe account for this user'''
@@ -222,7 +223,8 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
                                             hashed_password=hashed_password,
                                             salt=salt,
                                             stripe_account_id=stripe_account_id,
-                                            customer_id=stripe_customer_id)
+                                            customer_id=stripe_customer_id,
+                                            notification_token=not_token)
             user_key = user_key.urlsafe()
         else:
             user_key = returned_user.key.urlsafe()
@@ -367,6 +369,21 @@ class ChargeRiderTaskHandler(webapp2.RequestHandler):
         else:
             self.response.status_int = 500
             self.response.write(json.dumps(resp , default=json_handler) )
+
+class UpdateTokenHandler(webapp2.RequestHandler):
+    def post(self):
+        params = self.request.params
+
+        user_key = params['user_key']
+        token = params['token']
+
+        user = ndb.Key(urlsafe=user_key).get()
+        user.notification_token = token
+        user.put()
+
+        obj = { 'status' : 'Token Updated'}
+        self.response.status_int = 200
+        self.response.write(json.dumps(obj, default=json_handler))
         
 
 app = webapp2.WSGIApplication([
@@ -381,6 +398,7 @@ app = webapp2.WSGIApplication([
     ('/api/fetchUserFeed', FetchUserFeedHandler),
     ('/api/handleNotification', NotificationTaskHandler),
     ('/api/createUser', CreateUserTasksHandler),
+    ('/api/updateNotificationToken', UpdateTokenHandler)
     ('/api/ephemeral_keys', StripeTempKeyHandler),
     ('/api/chargeRider', ChargeRiderTaskHandler),
     ('/api/updateUser', UpdateUserHandler),
