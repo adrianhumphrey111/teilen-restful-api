@@ -12,7 +12,7 @@ import time
 
 class Payment:
     
-    def __init__(self, first_name, last_name, email):
+    def __init__(self, first_name="", last_name="", email=""):
         self.email = email
         self.first_name = first_name
         self.last_name = last_name
@@ -75,22 +75,149 @@ class Payment:
         print token.id
         return token
     
-    def updateUser(self):
-        '''
-        account.legal_entity.dob.day = 4
-        account.legal_entity.dob.month = 5
-        account.legal_entity.dob.year = 1995
-        account.legal_entity.ssn_last_4 = "9559"
+    def chargeRider(self, amount, customer_id, transaction_key):
+        stripe.api_key = config.stripe_api_key_secret
         
-        #Set the address of for the user
-        account.legal_entity.address.line1 = "6503 Del Playa Dr"
-        account.legal_entity.address.city = "Goleta"
-        account.legal_entity.address.state = "CA"
-        account.legal_entity.address.postal_code = "93117"
-        '''
-        pass
-
-
+        try:
+            # Use Stripe's library to make requests...
+            resp = stripe.Charge.create(
+                          amount=amount,
+                          currency="usd",
+                          customer=customer_id, # obtained with Stripe.js
+                          metadata={'transaction_key': transaction_key}
+                        )
+            return True, resp
+        except stripe.error.CardError as e:
+            # Since it's a decline, stripe.error.CardError will be caught
+            body = e.json_body
+            err  = body.get('error', {})
+            error = {'Status is:': e.http_status,
+                     'Type is: ' : err.get('type'),
+                     'Code is: ': err.get('code'),
+                     'Param is: ': err.get('param'),
+                     'Message is: ': err.get('message')}
         
+            print "Status is: %s" % e.http_status
+            print "Type is: %s" % err.get('type')
+            print "Code is: %s" % err.get('code')
+            # param is '' in this case
+            print "Param is: %s" % err.get('param')
+            print "Message is: %s" % err.get('message')
+            
+            return False, error
+        except stripe.error.RateLimitError as e:
+            # Too many requests made to the API too quickly
+            body = e.json_body
+            err  = body.get('error', {})
+            error = {'Status is:': e.http_status,
+                     'Type is: ' : err.get('type'),
+                     'Code is: ': err.get('code'),
+                     'Param is: ': err.get('param'),
+                     'Message is: ': err.get('message')}
+        
+            print "Status is: %s" % e.http_status
+            print "Type is: %s" % err.get('type')
+            print "Code is: %s" % err.get('code')
+            # param is '' in this case
+            print "Param is: %s" % err.get('param')
+            print "Message is: %s" % err.get('message')
+            
+            return False, error
+        except stripe.error.InvalidRequestError as e:
+            # Invalid parameters were supplied to Stripe's API
+            body = e.json_body
+            err  = body.get('error', {})
+            error = {'Status is:': e.http_status,
+                     'Type is: ' : err.get('type'),
+                     'Code is: ': err.get('code'),
+                     'Param is: ': err.get('param'),
+                     'Message is: ': err.get('message')}
+        
+            print "Status is: %s" % e.http_status
+            print "Type is: %s" % err.get('type')
+            print "Code is: %s" % err.get('code')
+            # param is '' in this case
+            print "Param is: %s" % err.get('param')
+            print "Message is: %s" % err.get('message')
+            
+            return False, error
+        except stripe.error.AuthenticationError as e:
+            # Authentication with Stripe's API failed
+            # (maybe you changed API keys recently)
+            body = e.json_body
+            err  = body.get('error', {})
+            error = {'Status is:': e.http_status,
+                     'Type is: ' : err.get('type'),
+                     'Code is: ': err.get('code'),
+                     'Param is: ': err.get('param'),
+                     'Message is: ': err.get('message')}
+        
+            print "Status is: %s" % e.http_status
+            print "Type is: %s" % err.get('type')
+            print "Code is: %s" % err.get('code')
+            # param is '' in this case
+            print "Param is: %s" % err.get('param')
+            print "Message is: %s" % err.get('message')
+            
+            return False, error
+        except stripe.error.APIConnectionError as e:
+            # Network communication with Stripe failed
+            body = e.json_body
+            err  = body.get('error', {})
+            error = {'Status is:': e.http_status,
+                     'Type is: ' : err.get('type'),
+                     'Code is: ': err.get('code'),
+                     'Param is: ': err.get('param'),
+                     'Message is: ': err.get('message')}
+        
+            print "Status is: %s" % e.http_status
+            print "Type is: %s" % err.get('type')
+            print "Code is: %s" % err.get('code')
+            # param is '' in this case
+            print "Param is: %s" % err.get('param')
+            print "Message is: %s" % err.get('message')
+            
+            return False, error
+        except stripe.error.StripeError as e:
+            # Display a very generic error to the user, and maybe send
+            # yourself an email
+            body = e.json_body
+            err  = body.get('error', {})
+            error = {'Status is:': e.http_status,
+                     'Type is: ' : err.get('type'),
+                     'Code is: ': err.get('code'),
+                     'Param is: ': err.get('param'),
+                     'Message is: ': err.get('message')}
+        
+            print "Status is: %s" % e.http_status
+            print "Type is: %s" % err.get('type')
+            print "Code is: %s" % err.get('code')
+            # param is '' in this case
+            print "Param is: %s" % err.get('param')
+            print "Message is: %s" % err.get('message')
+            
+            return False, error
+        except Exception as e:
+            # Something else happened, completely unrelated to Stripe
+            body = e.json_body
+            err  = body.get('error', {})
+            error = {'Status is:': e.http_status,
+                     'Type is: ' : err.get('type'),
+                     'Code is: ': err.get('code'),
+                     'Param is: ': err.get('param'),
+                     'Message is: ': err.get('message')}
+        
+            print "Status is: %s" % e.http_status
+            print "Type is: %s" % err.get('type')
+            print "Code is: %s" % err.get('code')
+            # param is '' in this case
+            print "Param is: %s" % err.get('param')
+            print "Message is: %s" % err.get('message')
+            
+            return False, error
+    
+        
+        
+
         
         

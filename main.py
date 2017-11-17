@@ -18,7 +18,7 @@ import webapp2
 from google.appengine.ext import ndb
 import google
 from google.appengine.api import taskqueue
-from models import Post, User, Comment, Location, Trip
+from models import Post, User, Comment, Location, Trip, Transaction
 from postFetcher import PostFetcher
 import json
 import datetime
@@ -188,10 +188,11 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
         profile_pic_url = params['user[profile_pic_url]']
         password = params['user[password]']
         
-        '''Stripe User'''
-        new_stripe_user = None
-        stripe_account_id = ""
-        stripe_customer_id = ""
+
+        '''Create a stripe account for this user'''
+        new_stripe_user = Payment(first_name=first_name, last_name=last_name, email=email)
+        stripe_customer_id = new_stripe_user.createCustomer()
+        stripe_account_id = new_stripe_user.createUser()
         
         '''Hash The password'''
         salt = uuid.uuid4().hex
@@ -211,12 +212,6 @@ class CreateUserTasksHandler(webapp2.RequestHandler):
         for user in users:
             print user
             returned_user = user
-            
-            '''Create a stripe account for this user'''
-            new_stripe_user = Payment(first_name=first_name, last_name=last_name, email=email)
-            stripe_customer_id = new_stripe_user.createCustomer()
-            stripe_account_id = new_stripe_user.createUser()
-            
         if len( users ) == 0:
             '''Save User to the databases'''
             user_key = User.create_new_user(first_name=first_name, 
@@ -339,8 +334,40 @@ class NotificationTaskHandler(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
-
-       
+        
+class ChargeRiderTaskHandler(webapp2.RequestHandler):
+    def post(self):
+        params = self.request.params
+        user_key = params['user_key']
+       # driver_key = params['driver_key']
+        #source = params['source']
+        customer_id = params['customer_id']
+        amount = int(params['amount'])
+        
+        '''Grab users'''
+        rider = ndb.Key(urlsafe=user_key).get()
+        #driver = ndb.=Key(urlsafe=driver_key).get()
+        
+        '''Create a Transaction'''
+        transaction = Transaction()
+        transaction.user_charged_key = rider.key
+        #transaction.driver_debited_key = driver.key
+        transaction.status = 'initiated'
+        transaction_key = transaction.put()
+        
+        '''Save Transaction to User model'''
+        rider.transaction_keys.append(transaction_key)
+        
+        '''Charge the Rider'''
+        success, resp = Payment().chargeRider(amount=amount, customer_id=customer_id, transaction_key=transaction_key)
+        self.response.headers['Content-Type'] = 'application/json'
+        if success:
+            resp['success'] = True
+            self.response.write(json.dumps(resp , default=json_handler) )
+        else:
+            self.response.status_int = 500
+            self.response.write(json.dumps(resp , default=json_handler) )
+        
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
@@ -355,6 +382,7 @@ app = webapp2.WSGIApplication([
     ('/api/handleNotification', NotificationTaskHandler),
     ('/api/createUser', CreateUserTasksHandler),
     ('/api/ephemeral_keys', StripeTempKeyHandler),
+    ('/api/chargeRider', ChargeRiderTaskHandler),
     ('/api/updateUser', UpdateUserHandler),
     ('/api/deletePost', DeletePostHandler),
     ('/api/createStripeUser', CreateStripeUser),

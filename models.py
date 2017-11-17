@@ -54,6 +54,7 @@ class User(ndb.Model):
     school = ndb.StringProperty()
     salt = ndb.StringProperty()
     hashed_password = ndb.StringProperty()
+    '''This account id is for drivers to be paid out'''
     stripe_account_id = ndb.StringProperty()
     customer_id = ndb.StringProperty()
     notification_token = ndb.StringProperty()
@@ -66,6 +67,7 @@ class User(ndb.Model):
     created_at = ndb.DateTimeProperty(auto_now_add=True)
     current_trip_id = ndb.StructuredProperty(Trip)
     planned_trip_ids = ndb.IntegerProperty(repeated=True)
+    transaction_keys = ndb.StringProperty(repeated=True)
     completed_trip_ids = ndb.IntegerProperty(repeated=True)
     numberOfCompletedTrips = ndb.IntegerProperty()
     rating = ndb.FloatProperty()
@@ -89,6 +91,7 @@ class User(ndb.Model):
         user.friend_ids = []
         user.post_ids = []
         user.reviews = []
+        user.transaction_keys = []
         user.rating = 5
         user.numberOfCompletedTrips = 0
         user.completed_trip_ids = []
@@ -273,6 +276,16 @@ class Review(ndb.Model):
     user_key = ndb.KeyProperty(kind=User)
     text = ndb.StringProperty()
     rating = ndb.StructuredProperty(Rating)
+    
+class Transaction(ndb.Model):
+    user_charged_key = ndb.KeyProperty(kind=User)
+    driver_debited_key = ndb.KeyProperty(kind=User)
+    trip_key = ndb.KeyProperty(kind=Trip)
+    time_initiated = ndb.DateTimeProperty(auto_now_add=True)
+    time_completed = ndb.DateTimeProperty()
+    status = ndb.StringProperty()
+    '''In Cents'''
+    amount_charged = ndb.IntegerProperty() 
         
 
 class TripType(ndb.Model):
@@ -280,4 +293,16 @@ class TripType(ndb.Model):
     MEDIUM = 'Medium'
     SHORT = 'Short'
 
+
+class Notification(ndb.Model):
+    type = ndb.StringProperty()
+    message = ndb.StringProperty()
+    from_user_key = ndb.StringProperty()
+    to_user_key = ndb.StringProperty()
+    
+    
+    
+    
+    
+    
 

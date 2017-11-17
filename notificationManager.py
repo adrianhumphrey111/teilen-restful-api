@@ -2,7 +2,6 @@ from google.appengine.ext import ndb
 from models import User
 import config
 
-
 # Send to single device.
 from pyfcm import FCMNotification
 
