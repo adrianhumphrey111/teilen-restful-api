@@ -126,13 +126,20 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         end_address2 = params['trip[endAddress][address2]']
         end_address_state = params['trip[endAddress][state]']
         end_address_city = params['trip[endAddress][city]']
-        end_address_zip_code = params['trip[endAddress][zipCode]']
+        #end_address_zip_code = params['trip[endAddress][zipCode]']
         
+        '''Trip information'''
         trip_time = params['trip[time]']
         trip_eta = params['trip[eta]']
-        post_text = params['trip[post_text]']
-        user_key = params['user_key']
         posted_by = params['trip[posted_by]']
+        seats  = params['trip[seats_available]']
+        
+        '''Post information'''
+        post_text = params['trip[post_text]']
+        
+        '''User information'''
+        user_key = params['user_key']
+        
         
         #Create Start Location 
         start_location = Location(address1=start_address1, address2=start_address2, city=start_address_city, state=start_address_state)
@@ -141,7 +148,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         end_location = Location(address1=end_address1, address2=end_address2, city=end_address_city, state=end_address_state)
         
         #Create the Trip to be associated with the post
-        trip_key = Trip(start_location=start_location, end_location=end_location).put()
+        trip_key = Trip(start_location=start_location, end_location=end_location, posted_by=posted_by, posted_by_key=user_key).put()
         post_key = Post.create_post(user_key=user_key, text=post_text, trip_key=trip_key)
         
         #SEnd Response
@@ -398,7 +405,7 @@ app = webapp2.WSGIApplication([
     ('/api/fetchUserFeed', FetchUserFeedHandler),
     ('/api/handleNotification', NotificationTaskHandler),
     ('/api/createUser', CreateUserTasksHandler),
-    ('/api/updateNotificationToken', UpdateTokenHandler)
+    ('/api/updateNotificationToken', UpdateTokenHandler),
     ('/api/ephemeral_keys', StripeTempKeyHandler),
     ('/api/chargeRider', ChargeRiderTaskHandler),
     ('/api/updateUser', UpdateUserHandler),

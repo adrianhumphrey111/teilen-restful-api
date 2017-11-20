@@ -42,10 +42,11 @@ class Trip(ndb.Model):
     driver_key = ndb.IntegerProperty()
     passenger_keys = ndb.StringProperty(repeated=True)
     wait_list = ndb.StringProperty(repeated=True)
-    seats = ndb.IntegerProperty()
     seats_avialble = ndb.IntegerProperty()
     status = ndb.StructuredProperty(TripStatus)
     rate_per_seat = ndb.IntegerProperty() #in USD
+    posted_by = ndb.StringProperty() #driver or rider
+    posted_by_key = ndb.StringProperty() #the key for the user that actually posted the ride
 
 class User(ndb.Model):
     first_name = ndb.StringProperty()
@@ -208,6 +209,7 @@ class Post(ndb.Model):
     user_key = ndb.KeyProperty(kind=User)
     user = ndb.StructuredProperty(User)
     text = ndb.StringProperty()
+    type = ndb.StringProperty()
     trip_key = ndb.KeyProperty(kind=Trip)
     likeCount = ndb.IntegerProperty()
     commentCount = ndb.IntegerProperty()
