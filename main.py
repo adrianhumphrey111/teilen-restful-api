@@ -133,12 +133,15 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         trip_eta = params['trip[eta]']
         posted_by = params['trip[posted_by]']
 
-        try:
+        '''Driver Post Properties'''
+        seats = None
+        rate = None
+        radius = None
+
+        if posted_by == "driver":
             seats = int( params['trip[seats_available]'] )
             rate = int( params['trip[rate_per_seat]'] )
             radius = int( params['trip[radius]'] )
-        except AttributeError as e:
-            print 'This is a rider and did not provide these details'
         
         '''Post information'''
         post_text = params['trip[post_text]']
