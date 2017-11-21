@@ -51,7 +51,7 @@ class Trip(ndb.Model):
     @classmethod
     def create_trip(cls, start_location, end_location, posted_by, posted_by_key, seats_available, rate_per_seat):
         trip = Trip()
-        trip.posted_by_key = ndb.Key(urlsafe=posted_by_key)
+        trip.posted_by_key = posted_by_key
         trip.start_location = start_location
         trip.end_location = end_location
         trip.posted_by = posted_by
