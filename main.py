@@ -132,8 +132,13 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         trip_time = params['trip[time]']
         trip_eta = params['trip[eta]']
         posted_by = params['trip[posted_by]']
-        seats = int( params['trip[seats_available]'] )
-        rate = int( params['trip[rate_per_seat]'] )
+
+        try:
+            seats = int( params['trip[seats_available]'] )
+            rate = int( params['trip[rate_per_seat]'] )
+            radius = int( params['trip[radius]'] )
+        except AttributeError as e:
+            print 'This is a rider and did not provide these details'
         
         '''Post information'''
         post_text = params['trip[post_text]']
@@ -149,7 +154,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         end_location = Location(address1=end_address1, address2=end_address2, city=end_address_city, state=end_address_state)
         
         #Create the Trip to be associated with the post
-        trip_key = Trip.create_trip(start_location=start_location, end_location=end_location, posted_by=posted_by, posted_by_key=user_key, seats_available=seats, rate_per_seat=rate)
+        trip_key = Trip.create_trip(start_location=start_location, end_location=end_location, posted_by=posted_by, posted_by_key=user_key, seats_available=seats, rate_per_seat=rate, radius=radius)
         post_key = Post.create_post(user_key=user_key, text=post_text, trip_key=trip_key)
         
         #SEnd Response

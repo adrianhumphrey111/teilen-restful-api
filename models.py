@@ -44,12 +44,13 @@ class Trip(ndb.Model):
     wait_list = ndb.StringProperty(repeated=True)
     seats_available = ndb.IntegerProperty()
     status = ndb.StructuredProperty(TripStatus)
+    radius = ndb.IntegerProperty()
     rate_per_seat = ndb.IntegerProperty() #in USD
     posted_by = ndb.StringProperty() #driver or rider
     posted_by_key = ndb.StringProperty() #the key for the user that actually posted the ride
 
     @classmethod
-    def create_trip(cls, start_location, end_location, posted_by, posted_by_key, seats_available, rate_per_seat):
+    def create_trip(cls, start_location=None, end_location=None, posted_by="", posted_by_key="", seats_available=0, rate_per_seat=0, radius=0):
         trip = Trip()
         trip.posted_by_key = posted_by_key
         trip.start_location = start_location
@@ -57,6 +58,7 @@ class Trip(ndb.Model):
         trip.posted_by = posted_by
         trip.seats_available = seats_available
         trip.rate_per_seat = rate_per_seat
+        trip.radius = radius
         trip_key = trip.put()
         return trip_key
 
