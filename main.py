@@ -149,7 +149,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         end_location = Location(address1=end_address1, address2=end_address2, city=end_address_city, state=end_address_state)
         
         #Create the Trip to be associated with the post
-        trip_key = Trip.create_trip(start_location=start_location, end_location=end_location, posted_by=posted_by, posted_by_key=user_key, seats_avialble=seats, rate_per_seat=rate)
+        trip_key = Trip.create_trip(start_location=start_location, end_location=end_location, posted_by=posted_by, posted_by_key=user_key, seats_available=seats, rate_per_seat=rate)
         post_key = Post.create_post(user_key=user_key, text=post_text, trip_key=trip_key)
         
         #SEnd Response
