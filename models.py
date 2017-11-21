@@ -48,6 +48,18 @@ class Trip(ndb.Model):
     posted_by = ndb.StringProperty() #driver or rider
     posted_by_key = ndb.StringProperty() #the key for the user that actually posted the ride
 
+    @classmethod
+    def create_trip(self, start_location, end_location, posted_by, posted_by_key, seats_available, rate_per_seat):
+        trip = Trip()
+        trip.posted_by_key = ndb.Key(urlsafe=posted_by_key)
+        trip.start_location = start_location
+        trip.end_location = end_location
+        trip.posted_by = posted_by
+        trip.seats_avialble = seats_available
+        trip.rate_per_seat = rate_per_seat
+        trip_key = trip.put()
+        return trip_key
+
 class User(ndb.Model):
     first_name = ndb.StringProperty()
     last_name = ndb.StringProperty()
