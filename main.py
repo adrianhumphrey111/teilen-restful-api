@@ -132,8 +132,8 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         trip_time = params['trip[time]']
         trip_eta = params['trip[eta]']
         posted_by = params['trip[posted_by]']
-        seats = params['trip[seats_available]']
-        rate = params['trip[rate_per_seat]']
+        seats = int( params['trip[seats_available]'] )
+        rate = int( params['trip[rate_per_seat]'] )
         
         '''Post information'''
         post_text = params['trip[post_text]']
