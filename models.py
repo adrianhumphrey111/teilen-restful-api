@@ -2,6 +2,7 @@ from google.appengine.ext import ndb
 from protorpc import messages
 from google.appengine.ext.ndb import msgprop
 from google.appengine.ext.db import IntegerProperty
+from dateManager import DateManager
 
 
 class Location(ndb.Model):
@@ -39,10 +40,11 @@ class Trip(ndb.Model):
     end_time = ndb.DateTimeProperty()
     start_location = ndb.StructuredProperty( Location )
     end_location = ndb.StructuredProperty( Location )
-    driver_key = ndb.IntegerProperty()
+    #driver_key = ndb.IntegerProperty() is now posted_by
     passenger_keys = ndb.StringProperty(repeated=True)
     wait_list = ndb.StringProperty(repeated=True)
     seats_available = ndb.IntegerProperty()
+    requests = ndb.StringProperty(repeated=True) #List of strings of users that have submitted a request
     status = ndb.StructuredProperty(TripStatus)
     radius = ndb.IntegerProperty()
     rate_per_seat = ndb.IntegerProperty() #in USD
@@ -56,11 +58,25 @@ class Trip(ndb.Model):
         trip.start_location = start_location
         trip.end_location = end_location
         trip.posted_by = posted_by
+        trip.tripStatus = TripStatus.LOOKING
         trip.seats_available = seats_available
         trip.rate_per_seat = rate_per_seat
+        trip.requests = []
         trip.radius = radius
         trip_key = trip.put()
         return trip_key
+    
+    
+class Notification(ndb.Model):
+    type = ndb.StringProperty()
+    message = ndb.StringProperty()
+    from_user_key = ndb.StringProperty()
+    to_user_key = ndb.StringProperty()
+    trip_key = ndb.StringProperty()
+    status = ndb.StringProperty()
+    created_at = ndb.DateTimeProperty(auto_now_add=True)
+    
+    
 
 class User(ndb.Model):
     first_name = ndb.StringProperty()
@@ -69,6 +85,7 @@ class User(ndb.Model):
     school = ndb.StringProperty()
     salt = ndb.StringProperty()
     hashed_password = ndb.StringProperty()
+    requests_left = ndb.IntegerProperty()
     '''This account id is for drivers to be paid out'''
     stripe_account_id = ndb.StringProperty()
     customer_id = ndb.StringProperty()
@@ -77,19 +94,20 @@ class User(ndb.Model):
     facebook_id = ndb.StringProperty()
     car = ndb.StructuredProperty(Car)
     status = ndb.StructuredProperty(UserStatus)
-    billing_info = ndb.StringProperty()
     profile_pic_url = ndb.StringProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True)
-    current_trip_id = ndb.StructuredProperty(Trip)
+    current_trip = ndb.StructuredProperty(Trip)
     planned_trip_ids = ndb.IntegerProperty(repeated=True)
     transaction_keys = ndb.StringProperty(repeated=True)
     completed_trip_ids = ndb.IntegerProperty(repeated=True)
+    trip_requests = ndb.StringProperty(repeated=True) #list of keys for requests
     numberOfCompletedTrips = ndb.IntegerProperty()
     rating = ndb.FloatProperty()
     post_ids = ndb.IntegerProperty(repeated=True) #one to many relationship 
     friend_ids = ndb.IntegerProperty(repeated=True)
     friend_request_ids = ndb.IntegerProperty(repeated=True)
     requested_friend_ids = ndb.IntegerProperty(repeated=True)
+    notifications = ndb.StructuredProperty(Notification, repeated=True)
     
     @classmethod
     def create_new_user(self, first_name, last_name, email, profile_pic_url, facebook_id, hashed_password, salt, stripe_account_id, customer_id, notification_token):
@@ -108,6 +126,7 @@ class User(ndb.Model):
         user.post_ids = []
         user.reviews = []
         user.transaction_keys = []
+        user.requests_left = 4
         user.rating = 5
         user.numberOfCompletedTrips = 0
         user.completed_trip_ids = []
@@ -131,15 +150,17 @@ class User(ndb.Model):
     def retrieve_all_post(self, key):
         posts = []
         print key
-        for post in Post.query(Post.user_key == key).fetch():
+        for post in Post.query(Post.user_key == key).fetch(use_cache=False, use_memcache=False):
             post_key = post.key.urlsafe()
             user_key = post.user_key.urlsafe()
             like_count = Post.get_like_count( post_key )
             user_liked = Post.check_user_liked( user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key) )
             comment_count = Post.get_comment_count( post_key )
+            created_at_final = DateManager(tz=post.time_zone, created_at=post.created_at).final_time
             trip = None
             if post.trip_key.get() != None:
-                trip = post.trip_key.get().to_dict()
+                trip = post.trip_key.get(use_cache=False, use_memcache=False).to_dict()
+                print trip
             else:
                 trip = ""
             post=post.to_dict()
@@ -150,6 +171,7 @@ class User(ndb.Model):
             post['like_count'] = like_count
             post['comment_count'] = comment_count
             post['user_liked'] = user_liked
+            post['created_at'] = created_at_final
             post['trip'] = trip
             posts.append( post )
         return posts
@@ -216,6 +238,7 @@ class User(ndb.Model):
         user.pop('friend_ids', None)
         user.pop('friend_request_ids', None)
         user.pop('requested_friend_ids', None)
+        user.pop('notifications', None)
         return user
     
         
@@ -225,17 +248,20 @@ class Post(ndb.Model):
     text = ndb.StringProperty()
     type = ndb.StringProperty()
     trip_key = ndb.KeyProperty(kind=Trip)
-    likeCount = ndb.IntegerProperty()
-    commentCount = ndb.IntegerProperty()
     user_liked = ndb.BooleanProperty()
+    time_zone = ndb.StringProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True) 
     
     @classmethod
-    def create_post(cls, user_key, text, trip_key):
+    def create_post(cls, user_key, text, trip_key, time_zone):
         user_key = ndb.Key(urlsafe=user_key)
         post = Post(user_key=user_key, text=text)
         post.trip_key = trip_key
+        post.time_zone = time_zone
+        post.likeCount = 0
+        post.commentCount = 0
         post_key = post.put()
+        
         return post_key
     
     @classmethod
@@ -310,12 +336,11 @@ class TripType(ndb.Model):
     MEDIUM = 'Medium'
     SHORT = 'Short'
 
-
-class Notification(ndb.Model):
-    type = ndb.StringProperty()
-    message = ndb.StringProperty()
-    from_user_key = ndb.StringProperty()
-    to_user_key = ndb.StringProperty()
+    
+class TripRequest(ndb.Model):
+    user_key = ndb.KeyProperty(kind=User)
+    created_at = ndb.DateTimeProperty(auto_now_add=True)
+    status = ndb.StringProperty()
     
     
     

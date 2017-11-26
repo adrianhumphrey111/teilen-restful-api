@@ -18,13 +18,13 @@ import webapp2
 from google.appengine.ext import ndb
 import google
 from google.appengine.api import taskqueue
-from models import Post, User, Comment, Location, Trip, Transaction
+from models import Post, User, Comment, Location, Trip, Transaction, TripRequest, Notification
 from postFetcher import PostFetcher
 import json
 import datetime
 import hashlib, uuid
 from payment import Payment
-from notificationManager import Notification
+from notificationManager import FBNotification
 import stripe
 import config
 
@@ -36,6 +36,26 @@ def json_handler(x):
     if isinstance(x, google.appengine.ext.ndb.key.Key):
         return str(x)
     raise TypeError("Unknown type")
+
+def chargeRider(user, trip):    
+    customer_id = user.customer_id
+    amount = trip.rate_per_seat
+    
+    '''Create a Transaction'''
+    transaction = Transaction()
+    transaction.user_charged_key = user.key
+    #transaction.driver_debited_key = driver.key
+    transaction.status = 'initiated'
+    transaction_key = transaction.put()
+    
+    '''Save Transaction to User model'''
+    user.transaction_keys.append( transaction_key.urlsafe() )
+    user.put()
+    
+    '''Charge the Rider'''
+    success, resp = Payment().chargeRider(amount=amount, customer_id=customer_id, transaction_key=transaction_key)
+    
+    return success, resp
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
@@ -132,6 +152,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         trip_time = params['trip[time]']
         trip_eta = params['trip[eta]']
         posted_by = params['trip[posted_by]']
+        time_zone = params['time_zone']
 
         '''Driver Post Properties'''
         seats = None
@@ -158,7 +179,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         
         #Create the Trip to be associated with the post
         trip_key = Trip.create_trip(start_location=start_location, end_location=end_location, posted_by=posted_by, posted_by_key=user_key, seats_available=seats, rate_per_seat=rate, radius=radius)
-        post_key = Post.create_post(user_key=user_key, text=post_text, trip_key=trip_key)
+        post_key = Post.create_post(user_key=user_key, text=post_text, trip_key=trip_key, time_zone=time_zone)
         
         #SEnd Response
         self.response.headers['Content-Type'] = 'application/json' 
@@ -353,39 +374,6 @@ class NotificationTaskHandler(webapp2.RequestHandler):
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
         
-class ChargeRiderTaskHandler(webapp2.RequestHandler):
-    def post(self):
-        params = self.request.params
-        user_key = params['user_key']
-       # driver_key = params['driver_key']
-        #source = params['source']
-        customer_id = params['customer_id']
-        amount = int(params['amount'])
-        
-        '''Grab users'''
-        rider = ndb.Key(urlsafe=user_key).get()
-        #driver = ndb.=Key(urlsafe=driver_key).get()
-        
-        '''Create a Transaction'''
-        transaction = Transaction()
-        transaction.user_charged_key = rider.key
-        #transaction.driver_debited_key = driver.key
-        transaction.status = 'initiated'
-        transaction_key = transaction.put()
-        
-        '''Save Transaction to User model'''
-        rider.transaction_keys.append(transaction_key)
-        
-        '''Charge the Rider'''
-        success, resp = Payment().chargeRider(amount=amount, customer_id=customer_id, transaction_key=transaction_key)
-        self.response.headers['Content-Type'] = 'application/json'
-        if success:
-            resp['success'] = True
-            self.response.write(json.dumps(resp , default=json_handler) )
-        else:
-            self.response.status_int = 500
-            self.response.write(json.dumps(resp , default=json_handler) )
-
 class UpdateTokenHandler(webapp2.RequestHandler):
     def post(self):
         params = self.request.params
@@ -401,13 +389,216 @@ class UpdateTokenHandler(webapp2.RequestHandler):
         self.response.status_int = 200
         self.response.write(json.dumps(obj, default=json_handler))
         
+class GetTripHandler(webapp2.RequestHandler):
+    def get(self):
+        params = self.request.params
+        trip_key = params['trip_key']
+        trip = ndb.Key(urlsafe=trip_key).get(use_cache=False, use_memcache=False).to_dict()
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.write(json.dumps(trip, default=json_handler))
+        
+class ReserveSeatHandler(webapp2.RequestHandler):
+    def post(self):
+        params = self.request.params
+        user_key = params['user_key']
+        post_key = params['post_key']
+        user = ndb.Key(urlsafe=user_key).get(use_cache=False, use_memcache=False)
+        post = ndb.Key(urlsafe=post_key).get(use_cache=False, use_memcache=False) #The post changes often
+        trip = post.trip_key.get(use_cache=False, use_memcache=False)
+        driver = ndb.Key(urlsafe=trip.posted_by_key).get()
+        
+        obj = {}
+        #Check if this user has already requested this seat
+        if user_key not in trip.requests and trip.seats_available > 0:
+            
+            #Add this request to the user sending the request, 4 max
+            tripRequest = TripRequest()
+            tripRequest.user_key = ndb.Key(urlsafe=user_key)
+            tripRequest.status = "None"
+            tripRequest_key = tripRequest.put()
+            user.trip_requests.append( tripRequest_key.urlsafe() ) #expected string
+            
+            
+            #Add this request to the drivers request
+            trip.requests.append(user_key)
+            trip.put()
+            
+            #Create notification and add it to the drivers list of notifications
+            notification = Notification()
+            notification.type = "seat_request"
+            notification.from_user_key = user_key
+            notification.to_user_key = trip.posted_by_key
+            notification.trip_key = post.trip_key.urlsafe()
+            
+            
+            #Send notification to the drivers phone to accept the request, he should also in the notifications
+            fb_notification = FBNotification(type=notification.type, 
+                                             to_user_key=notification.to_user_key,
+                                             trip_key=post.trip_key,
+                                             from_user_key=notification.from_user_key)
+            
+            resp = fb_notification.send()
+            print 'notification response'
+            print resp
+            
+            #Add notification to the user
+            notification.message = fb_notification.createMessage()
+            user.notifications.append( notification )
+            
+            #Decrement request left
+            count = user.requests_left
+            count = count - 1
+            user.requests_left = count
+            
+            #Save user
+            user.put()
+            
+            #Send the response
+            obj['success'] = True
+            self.response.headers['Content-Type'] = 'application/json'
+            self.response.write(json.dumps(obj, default=json_handler))
+        else:
+            obj['success'] = False
+            obj['error_message'] = 'ride already requested'
+            
+            #Tell the user that you have already requested this ride, we will let you know the drivers response
+            if trip.seats_available == 0:
+                obj['error_message'] == 'no seats available'
+                
+            self.response.headers['Content-Type'] = 'application/json'
+            self.response.write(json.dumps(obj, default=json_handler))
+        
+class FetchNotificationsHandler(webapp2.RequestHandler):
+    def get(self):
+        params = self.request.params
+        user_key = params['user_key']
+        user = ndb.Key(urlsafe=user_key).get(use_cache=False, use_memcache=False)
+        notifications = user.notifications
+        return_notifications = []
+        if not notifications:
+            #the list is empty
+            self.response.headers['Content-Type'] = 'application/json'  
+            self.response.out.write(json.dumps([], default=json_handler))
+
+        else:
+            #The notification list is not empty
+            for notif in notifications:
+                key = notif.created_at
+                user_key = ndb.Key(urlsafe=notif.from_user_key)
+                user = user_key.get(use_cache=False, use_memcache=False)
+                user = user.to_dict()
+                notif = notif.to_dict()
+                notif['user'] = user
+                notif['user']['user_key'] = user_key.urlsafe()
+                notif['key'] = key
+                return_notifications.append(notif)
+            
+            self.response.headers['Content-Type'] = 'application/json'  
+            self.response.out.write(json.dumps([notification for notification in return_notifications], default=json_handler))
+            
+class AcceptRiderHanlder(webapp2.RequestHandler):
+    def post(self):
+        params = self.request.params
+        user_key = params['user_key']
+        rider_key = params['rider_key']
+        trip_key = params['trip_key']
+        
+        #Get users
+        user = ndb.Key(urlsafe=user_key).get(use_cache=False, use_memcache=False)
+        rider = ndb.Key(urlsafe=rider_key).get(use_cache=False, use_memcache=False)
+        trip = ndb.Key(urlsafe=trip_key).get()
+
+        # Charge the rider only if they have not been charged for the ride
+        if rider_key not in trip.passenger_keys:
+            success, resp = chargeRider(user=rider, trip=trip) #Only do the following if the charge was successful
+            if success :
+            
+                # Add this user to the array of users riding on this trip
+                trip.passenger_keys.append( rider_key )
+                
+                # Decrement the seats available
+                count = trip.seats_available
+                count = count + 1
+                trip.seats_available = count 
+                
+                # Reset the riders number of available request
+                rider.request_left = 4
+                
+                # Remove the riders key from the notification array from the driver
+                if user_key in trip.requests:
+                    trip.requests.remove( user_key )
+    
+                
+                #On success notify the rider that the driver has accepted the rider and you have been charged and reciept sent to your email.
+                fb_notification = FBNotification(type='driver_accepted_reservation', 
+                                                     to_user_key=rider_key,
+                                                     trip_key=ndb.Key(urlsafe=trip_key),
+                                                     from_user_key=user_key)
+                fb_notification.send()
+                
+                #Save trip, user, rider, notification
+                user.put()
+                rider.put()
+                trip.put()
+                
+                obj = {}
+                obj['resp'] = resp
+                obj['success'] = True
+                self.response.headers['Content-Type'] = 'application/json'  
+                self.response.out.write(json.dumps(obj, default=json_handler))
+            else:
+                obj = {}
+                obj['resp'] = resp
+                obj['success'] = True
+                self.response.headers['Content-Type'] = 'application/json'  
+                self.response.out.write(json.dumps(obj, default=json_handler))
+        else:
+            obj = {}
+            obj['resp'] = 'User Already in the ride, do not charge'
+            obj['success'] = False
+            self.response.headers['Content-Type'] = 'application/json'  
+            self.response.out.write(json.dumps(obj, default=json_handler))   
+            
+class DenyRiderHandler(webapp2.RequestHandler):
+    def post(self):
+        params = self.request.params
+        user_key = params['user_key']
+        rider_key = params['rider_key']
+        trip_key = params['trip_key']
+        
+        #Get users
+        user = ndb.Key(urlsafe=user_key).get(use_cache=False, use_memcache=False)
+        rider = ndb.Key(urlsafe=rider_key).get(use_cache=False, use_memcache=False)
+        trip = ndb.Key(urlsafe=trip_key).get()
+        
+        #Since the driver has denied the riders, request, just send them the notification and remove their key from the trips notifications
+        notification = FBNotification(type="driver_denied_reservation",
+                                      to_user_key=rider_key,
+                                      trip_key=ndb.Key(urlsafe=trip_key),
+                                      from_user_key=user_key)
+        notification.send()
+        
+        #remove the users key from the trips request
+        if rider_key in trip.requests:
+            trip.requests.remove( rider_key )
+            
+        obj = {}
+        obj['success'] = True
+        self.response.headers['Content-Type'] = 'application/json'  
+        self.response.out.write(json.dumps(obj, default=json_handler))  
+        
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
     ('/api/login', LoginHandler),
     ('/api/search', SearchHandler),
     ('/api/likePost', LikePostTaskHandler),
+    ('/api/getTrip', GetTripHandler),
+    ('/api/reserveSeat', ReserveSeatHandler),
     ('/api/unlikePost', UnLikePostTaskHandler),
+    ('/api/acceptRider', AcceptRiderHanlder),
+    ('/api/denyRider', DenyRiderHandler),
+    ('/api/fetchNotifications', FetchNotificationsHandler),
     ('/api/commentPost', CommentPostTasksHandler),
     ('/api/createPost', CreateMediaPostTaskHandler),
     ('/api/fetchFeed', FetchFeedHandler),
@@ -416,7 +607,6 @@ app = webapp2.WSGIApplication([
     ('/api/createUser', CreateUserTasksHandler),
     ('/api/updateNotificationToken', UpdateTokenHandler),
     ('/api/ephemeral_keys', StripeTempKeyHandler),
-    ('/api/chargeRider', ChargeRiderTaskHandler),
     ('/api/updateUser', UpdateUserHandler),
     ('/api/deletePost', DeletePostHandler),
     ('/api/createStripeUser', CreateStripeUser),

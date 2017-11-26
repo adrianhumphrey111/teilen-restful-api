@@ -57,7 +57,7 @@ class NotificationHandler(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([
     ('/tasks/likePost', LikeMediaPostHandler),
     ('/tasks/unlikePost', UnLikeMediaPostHandler),
-    ('/tasks/commentPost', CommentPostHandler)
+    ('/tasks/commentPost', CommentPostHandler),
     ('/tasks/addFriend', AddFriendHandler),
     ('/tasks/handleNotification', NotificationHandler),
     ('/tasks/requestFriend', RequestFriendHandler)
