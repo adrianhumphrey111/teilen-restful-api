@@ -74,13 +74,7 @@ class DateManager:
     def secondsBetween(self):
         seconds = self.now - self.date
         return seconds.total_seconds()
-    
-created_at = '2017-11-25T08:38:50.237240'
 
-datetime_object = datetime.strptime('Nov 19 2017 2:50PM', '%b %d %Y %I:%M%p')
-tz = "America/Los_Angeles"
-dm = DateManager(tz=tz, created_at=datetime_object) 
-print dm.final_time
             
             
             

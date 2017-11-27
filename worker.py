@@ -8,7 +8,7 @@ from google.appengine.ext import ndb
 from models import User, Comment, Post, Like, Location, Trip
 import webapp2
 
-from notificationManager import Notification
+from notificationManager import FBNotification
 
 
 class LikeMediaPostHandler(webapp2.RequestHandler):
@@ -47,7 +47,7 @@ class NotificationHandler(webapp2.RequestHandler):
         type = str(self.request.get('type'))
 
         #Depending on the type of notification will it be a data notification or not
-        result = Notification(type=type, to_user_key=to_key, from_user_key=from_key).send()
+        result = FBNotification(type=type, to_user_key=to_key, from_user_key=from_key).send()
 
         #Do somthing with this result
         print result

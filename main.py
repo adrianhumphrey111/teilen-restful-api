@@ -25,6 +25,7 @@ import datetime
 import hashlib, uuid
 from payment import Payment
 from notificationManager import FBNotification
+from dateManager import DateManager
 import stripe
 import config
 
@@ -279,15 +280,18 @@ class CommentPostTasksHandler(webapp2.RequestHandler):
     def post(self):
         user_key = str(self.request.get('user_key'))
         post_key = str(self.request.get('post_key'))
-        comment_text = str(self.request.get('comment'))
+        comment_text = self.request.get('comment')
         urlsafe_comment_key = Comment(user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key), text=comment_text).put().urlsafe()
         comment = ndb.Key(urlsafe=urlsafe_comment_key).get()
         user_key_urlsafe = comment.user_key.urlsafe()
         post_key_urlsafe = comment.post_key.urlsafe()
+        post = comment.post_key.get()
+        created_at_final = DateManager(tz=post.time_zone, created_at=post.created_at).final_time
         comment = comment.to_dict()
         comment['user_key'] = user_key_urlsafe
         comment['post_key'] = post_key_urlsafe
         comment['comment_key'] = urlsafe_comment_key
+        comment['created_at'] = created_at_final
         
         #Should be a response to the user that says, they have liked the post
         obj = {'comment': comment}
@@ -488,7 +492,7 @@ class FetchNotificationsHandler(webapp2.RequestHandler):
                 user = user_key.get(use_cache=False, use_memcache=False)
                 user = user.to_dict()
                 notif = notif.to_dict()
-                notif['user'] = user
+                notif['user'] = User.user_for_app( user )
                 notif['user']['user_key'] = user_key.urlsafe()
                 notif['key'] = key
                 return_notifications.append(notif)

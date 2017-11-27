@@ -150,7 +150,7 @@ class User(ndb.Model):
     def retrieve_all_post(self, key):
         posts = []
         print key
-        for post in Post.query(Post.user_key == key).fetch(use_cache=False, use_memcache=False):
+        for post in Post.query(Post.user_key == key).order(-Post.created_at).fetch(use_cache=False, use_memcache=False):
             post_key = post.key.urlsafe()
             user_key = post.user_key.urlsafe()
             like_count = Post.get_like_count( post_key )
@@ -239,6 +239,10 @@ class User(ndb.Model):
         user.pop('friend_request_ids', None)
         user.pop('requested_friend_ids', None)
         user.pop('notifications', None)
+        user.pop('hashed_password', None)
+        user.pop('transaction_keys', None)
+        user.pop('salt', None)
+        
         return user
     
         
@@ -292,6 +296,23 @@ class Comment(ndb.Model):
     post_key = ndb.KeyProperty(kind=Post)
     text = ndb.StringProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True)
+    
+    @classmethod
+    def getCommentsForPost(cls, post_key):
+        post = post_key.get()
+        tz = post.time_zone
+        comments = []
+        for comment in cls.query(cls.post_key == post_key ).order(cls.created_at).fetch():
+            post_key_urlsafe = comment.post_key.urlsafe()
+            user_key_urlsafe = comment.user_key.urlsafe()
+            created_at_final = DateManager(tz=tz, created_at=comment.created_at).final_time
+            comment = comment.to_dict()
+            comment['user'] = User.user_for_app( post.user_key.get().to_dict() )
+            comment['post_key'] = post_key_urlsafe
+            comment['user_key'] = user_key_urlsafe
+            comment['created_at'] = created_at_final
+            comments.append( comment  )
+        return comments
     
     @classmethod
     def delete_comment(cls, comment_id):
