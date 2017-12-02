@@ -22,10 +22,11 @@ class FBNotification:
         self.destination = ""
         
         # Configure Trip
-        self.trip = trip_key.get(use_cache=False, use_memcache=False)
+        if trip_key != None:
+            self.trip = trip_key.get(use_cache=False, use_memcache=False)
         
-        # Get date and destination of trip
-        self.getDateAndDestination()
+            # Get date and destination of trip
+            self.getDateAndDestination()
 
         #Message
         self.messageTitle = "Tielen Ride Share"

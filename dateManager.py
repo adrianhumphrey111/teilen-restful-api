@@ -74,7 +74,9 @@ class DateManager:
     def secondsBetween(self):
         seconds = self.now - self.date
         return seconds.total_seconds()
-
+        
+    def eta_time(self):
+        return self.nowWithtz.strftime('%b %d, %-I:%M%p')
             
             
             

@@ -5,7 +5,7 @@ Created on Oct 23, 2017
 '''
 
 from google.appengine.ext import ndb
-from models import User, Comment, Post, Like, Location, Trip
+from models import User, Comment, Post, Like, Location, Trip, Notification
 import webapp2
 
 from notificationManager import FBNotification
@@ -35,10 +35,43 @@ class AddFriendHandler(webapp2.RequestHandler):
     def post(self):
         User.add_friend( user_url_key=str(self.request.get('user_key')), friend_url_key=str(self.request.get('friend_key')))
         
+class DenyFriendHandler(webapp2.RequestHandler):
+    def post(self):
+        User.deny_request( user_url_key=str(self.request.get('user_key')), friend_url_key=str(self.request.get('friend_key')))
         
+        
+class RemoveRequestHandler(webapp2.RequestHandler):
+    def post(self):
+        User.remove_friend_request( user_url_key=str(self.request.get('user_key')), friend_url_key=str(self.request.get('friend_key')))
+    
 class RequestFriendHandler(webapp2.RequestHandler):
     def post(self):
-        User.request_friend( user_url_key=str(self.request.get('user_key')), friend_url_key=str(self.request.get('friend_key')))
+        user_key = str(self.request.get('user_key') )
+        friend_key = str(self.request.get('friend_key') )
+        User.request_friend( user_url_key=user_key, friend_url_key=friend_key)
+        
+        #Send notification
+        fb_notification = FBNotification(type='friend_request', 
+                                             to_user_key=friend_key,
+                                             trip_key=None,
+                                             from_user_key=user_key)
+            
+        fb_notification.send()
+        
+        #Create notification and add it to the friends list of notifications
+        notification = Notification()
+        notification.type = "friend_request"
+        notification.from_user_key = user_key
+        notification.to_user_key = friend_key
+        notification.message = fb_notification.createMessage()
+        
+        user = ndb.Key(urlsafe=user_key).get( use_cache=False, use_memcache=False )
+        user.notifications.append( notification )
+        user.put()
+        
+class RemoveFriendHanlder(webapp2.RequestHandler):
+    def post(self):
+        User.remove_friend( user_url_key=str(self.request.get('user_key')), friend_url_key=str(self.request.get('friend_key')))
 
 class NotificationHandler(webapp2.RequestHandler):
     def post(self):
@@ -58,7 +91,10 @@ app = webapp2.WSGIApplication([
     ('/tasks/likePost', LikeMediaPostHandler),
     ('/tasks/unlikePost', UnLikeMediaPostHandler),
     ('/tasks/commentPost', CommentPostHandler),
+    ('/tasks/denyRequest', DenyFriendHandler),
     ('/tasks/addFriend', AddFriendHandler),
+    ('/tasks/removeFriend', RemoveFriendHanlder),
+    ('/tasks/removeRequest', RemoveRequestHandler),
     ('/tasks/handleNotification', NotificationHandler),
     ('/tasks/requestFriend', RequestFriendHandler)
 ], debug=True)

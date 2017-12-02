@@ -28,14 +28,18 @@ from notificationManager import FBNotification
 from dateManager import DateManager
 import stripe
 import config
+import logging
 
 stripe.api_key = config.stripe_api_key_secret
+logging.getLogger().setLevel(logging.INFO)
 
 def json_handler(x):
     if isinstance(x, datetime.datetime):
         return x.isoformat()
     if isinstance(x, google.appengine.ext.ndb.key.Key):
         return str(x)
+    print 'The type is =>'
+    print x
     raise TypeError("Unknown type")
 
 def chargeRider(user, trip):    
@@ -150,7 +154,7 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         #end_address_zip_code = params['trip[endAddress][zipCode]']
         
         '''Trip information'''
-        trip_time = params['trip[time]']
+        time_chosen = params['trip[chosen_time]']
         trip_eta = params['trip[eta]']
         posted_by = params['trip[posted_by]']
         time_zone = params['time_zone']
@@ -170,7 +174,10 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         
         '''User information'''
         user_key = params['user_key']
-        
+        user = ndb.Key(urlsafe=user_key).get( use_cache=False, use_memcache=False )
+        count = user.numberOfPost + 1
+        user.numberOfPost = count
+        user.put()
         
         #Create Start Location 
         start_location = Location(address1=start_address1, address2=start_address2, city=start_address_city, state=start_address_state)
@@ -179,7 +186,15 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         end_location = Location(address1=end_address1, address2=end_address2, city=end_address_city, state=end_address_state)
         
         #Create the Trip to be associated with the post
-        trip_key = Trip.create_trip(start_location=start_location, end_location=end_location, posted_by=posted_by, posted_by_key=user_key, seats_available=seats, rate_per_seat=rate, radius=radius)
+        trip_key = Trip.create_trip(start_location=start_location, 
+                                    end_location=end_location, 
+                                    posted_by=posted_by, 
+                                    posted_by_key=user_key, 
+                                    seats_available=seats, 
+                                    rate_per_seat=rate, 
+                                    radius=radius,
+                                    eta = trip_eta,
+                                    time_chosen=time_chosen)
         post_key = Post.create_post(user_key=user_key, text=post_text, trip_key=trip_key, time_zone=time_zone)
         
         #SEnd Response
@@ -190,19 +205,29 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         
 class FetchFeedHandler(webapp2.RequestHandler):
     def get(self):
-        #return a fetch object with all posts and appropriate things needed for the app to populate
-        feed = PostFetcher(user_key=str(self.request.get('user_key')))
-        posts = feed.get_all_posts()
-        self.response.headers['Content-Type'] = 'application/json'  
-        self.response.out.write(json.dumps([post for post in posts], default=json_handler))
+        if ( self.request.get('user_key') == None or self.request.get('user_key') == None ):
+            self.response.headers['Content-Type'] = 'application/json'
+            self.response.out.write(json.dumps([], default=json_handler))
+        else:
+            #return a fetch object with all posts and appropriate things needed for the app to populate
+            feed = PostFetcher(user_key=str(self.request.get('user_key')))
+            posts = feed.get_all_posts()
+            for post in posts:
+                print post
+            self.response.headers['Content-Type'] = 'application/json'  
+            self.response.out.write(json.dumps([post.to_dict() for post in posts], default=json_handler))
         
 class FetchUserFeedHandler(webapp2.RequestHandler):
     def get(self):
         #return a fetch object with all posts and appropriate things needed for the app to populate
-        feed = PostFetcher(user_key=str(self.request.get('user_key')))
+        user_key = str( self.request.get('user_key') )
+        user = ndb.Key( urlsafe=user_key ).get( use_cache=False, use_memcache=False )
+
+        
+        feed = PostFetcher(user_key= user_key )
         posts = feed.get_all_user_posts()
         self.response.headers['Content-Type'] = 'application/json'  
-        self.response.out.write(json.dumps([post for post in posts], default=json_handler))  
+        self.response.out.write(json.dumps([post.to_dict() for post in posts], default=json_handler))  
         
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
@@ -300,8 +325,33 @@ class CommentPostTasksHandler(webapp2.RequestHandler):
 class DeletePostHandler(webapp2.RequestHandler):
     def post(self):
         Post.delete_post(str(self.request.get('post_key')))
+        obj = {}
+        obj['success'] = True
         self.response.headers['Content-Type'] = 'application/json'
-        self.response.write('Post successfully deleted')
+        self.response.write( json.dumps(obj , default=json_handler) )
+        
+class DeleteAccountHandler(webapp2.RequestHandler):
+    def post(self):
+        User.delete_user(str(self.request.get('user_key')))
+        obj = {}
+        obj['success'] = True
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.write( json.dumps(obj , default=json_handler) )
+
+class DenyFriendTasksHandler(webapp2.RequestHandler):
+    def post(self):
+        #Add this task to add friend to list of friends
+        task = taskqueue.add(
+            url='/tasks/denyRequest',
+            target='worker',
+            params={'friend_key': str(self.request.get('friend_key')),
+                    'user_key': str(self.request.get('user_key'))
+                             })
+        #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        
         
 class AddFriendTasksHandler(webapp2.RequestHandler):
     def post(self):
@@ -319,9 +369,27 @@ class AddFriendTasksHandler(webapp2.RequestHandler):
         
 class RequestFriendTaksHandler(webapp2.RequestHandler):
     def post(self):
+        user_key = str(self.request.get('user_key') )
+        friend_key = str(self.request.get('friend_key') )
         #Add this task to add friend to list of friends
         task = taskqueue.add(
             url='/tasks/requestFriend',
+            target='worker',
+            params={'user_key': user_key,
+                    'friend_key': friend_key
+                             })
+        
+
+        #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
+        
+class RemoveFriendTaksHandler(webapp2.RequestHandler):
+    def post(self):
+        #Add this task to add friend to list of friends
+        task = taskqueue.add(
+            url='/tasks/removeFriend',
             target='worker',
             params={'user_key': str(self.request.get('user_key')),
                     'friend_key': str(self.request.get('friend_key'))
@@ -330,15 +398,21 @@ class RequestFriendTaksHandler(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'application/json'
         self.response.write(
             'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
-
-class UnfriendHanlder(webapp2.RequestHandler):
-    def post(self):
-        pass
+        
 
 class RemoveRequestHandler(webapp2.RequestHandler):
     def post(self):
-        
-        pass
+        #Add this task to add friend to list of friends
+        task = taskqueue.add(
+            url='/tasks/removeRequest',
+            target='worker',
+            params={'user_key': str(self.request.get('user_key')),
+                    'friend_key': str(self.request.get('friend_key'))
+                             })
+        #Should be a response to the user that says, they have liked the post
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.write(
+            'Task {} enqueued, ETA {}.'.format(task.name, task.eta))
     
 class CreateStripeUser(webapp2.RequestHandler):
     def post(self):
@@ -397,7 +471,7 @@ class GetTripHandler(webapp2.RequestHandler):
     def get(self):
         params = self.request.params
         trip_key = params['trip_key']
-        trip = ndb.Key(urlsafe=trip_key).get(use_cache=False, use_memcache=False).to_dict()
+        trip = ndb.Key(urlsafe=trip_key).get( use_cache=False, use_memcache=False ).to_dict()
         self.response.headers['Content-Type'] = 'application/json'
         self.response.write(json.dumps(trip, default=json_handler))
         
@@ -613,9 +687,11 @@ app = webapp2.WSGIApplication([
     ('/api/ephemeral_keys', StripeTempKeyHandler),
     ('/api/updateUser', UpdateUserHandler),
     ('/api/deletePost', DeletePostHandler),
+    ('/api/deleteAccount', DeleteAccountHandler),
     ('/api/createStripeUser', CreateStripeUser),
     ('/api/addFriend', AddFriendTasksHandler),
+    ('/api/denyFriend', DenyFriendTasksHandler),
     ('/api/requestFriend', RequestFriendTaksHandler),
-    ('/api/unfriend', UnfriendHanlder),
+    ('/api/removeFriend', RemoveFriendTaksHandler),
     ('/api/removeRequest', RemoveRequestHandler)
 ], debug=True)

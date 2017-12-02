@@ -3,6 +3,8 @@ from protorpc import messages
 from google.appengine.ext.ndb import msgprop
 from google.appengine.ext.db import IntegerProperty
 from dateManager import DateManager
+from __builtin__ import classmethod
+from datetime import datetime
 
 
 class Location(ndb.Model):
@@ -35,7 +37,7 @@ class TripStatus(ndb.Model):
     BOOKED = "Trip Not Started But Full"
     COMPLETED = "Trip Has Been Completed"
     
-class Trip(ndb.Model):
+class Trip(ndb.Expando):
     start_time = ndb.DateTimeProperty()
     end_time = ndb.DateTimeProperty()
     start_location = ndb.StructuredProperty( Location )
@@ -47,12 +49,14 @@ class Trip(ndb.Model):
     requests = ndb.StringProperty(repeated=True) #List of strings of users that have submitted a request
     status = ndb.StructuredProperty(TripStatus)
     radius = ndb.IntegerProperty()
+    chosen_time = ndb.StringProperty() #Either arrival or departure
+    eta = ndb.DateTimeProperty()
     rate_per_seat = ndb.IntegerProperty() #in USD
     posted_by = ndb.StringProperty() #driver or rider
     posted_by_key = ndb.StringProperty() #the key for the user that actually posted the ride
 
     @classmethod
-    def create_trip(cls, start_location=None, end_location=None, posted_by="", posted_by_key="", seats_available=0, rate_per_seat=0, radius=0):
+    def create_trip(cls, start_location=None, end_location=None, posted_by="", posted_by_key="", seats_available=0, rate_per_seat=0, radius=0, eta="", time_chosen=""):
         trip = Trip()
         trip.posted_by_key = posted_by_key
         trip.start_location = start_location
@@ -63,7 +67,11 @@ class Trip(ndb.Model):
         trip.rate_per_seat = rate_per_seat
         trip.requests = []
         trip.radius = radius
+        '''Convert to date'''
+        trip.eta = datetime.strptime(eta, "%Y-%m-%d %H:%M:%S")
+        trip.time_chosen = time_chosen
         trip_key = trip.put()
+
         return trip_key
     
     
@@ -78,7 +86,7 @@ class Notification(ndb.Model):
     
     
 
-class User(ndb.Model):
+class User(ndb.Expando):
     first_name = ndb.StringProperty()
     last_name = ndb.StringProperty()
     email = ndb.StringProperty()
@@ -102,6 +110,8 @@ class User(ndb.Model):
     completed_trip_ids = ndb.IntegerProperty(repeated=True)
     trip_requests = ndb.StringProperty(repeated=True) #list of keys for requests
     numberOfCompletedTrips = ndb.IntegerProperty()
+    numberOfPost = ndb.IntegerProperty()
+    numberOfFriends = ndb.IntegerProperty()
     rating = ndb.FloatProperty()
     post_ids = ndb.IntegerProperty(repeated=True) #one to many relationship 
     friend_ids = ndb.IntegerProperty(repeated=True)
@@ -128,6 +138,8 @@ class User(ndb.Model):
         user.transaction_keys = []
         user.requests_left = 4
         user.rating = 5
+        user.numberOfPost = 0
+        user.numberOfFriends = 0
         user.numberOfCompletedTrips = 0
         user.completed_trip_ids = []
         user.planned_trip_ids = []
@@ -146,6 +158,16 @@ class User(ndb.Model):
             setattr(user, key, kwargs[key])
         return user.put()'''
     
+    def is_friend(self, friend_key):
+        status = None
+        if ( friend_key.id() in self.friend_ids ):
+            status = "friend"
+        elif ( friend_key.id() in self.requested_friend_ids ):
+            status = "requested"
+        else:
+            status = "notFriend"
+        return status
+    
     @classmethod
     def retrieve_all_post(self, key):
         posts = []
@@ -153,6 +175,7 @@ class User(ndb.Model):
         for post in Post.query(Post.user_key == key).order(-Post.created_at).fetch(use_cache=False, use_memcache=False):
             post_key = post.key.urlsafe()
             user_key = post.user_key.urlsafe()
+            user = post.user_key.get( use_cache=False, use_memcache=False )
             like_count = Post.get_like_count( post_key )
             user_liked = Post.check_user_liked( user_key=ndb.Key(urlsafe=user_key), post_key=ndb.Key(urlsafe=post_key) )
             comment_count = Post.get_comment_count( post_key )
@@ -163,6 +186,7 @@ class User(ndb.Model):
                 print trip
             else:
                 trip = ""
+                '''
             post=post.to_dict()
             post.pop('user_key', None)
             post['user'] = self.user_for_app( key.get().to_dict() )
@@ -172,7 +196,17 @@ class User(ndb.Model):
             post['comment_count'] = comment_count
             post['user_liked'] = user_liked
             post['created_at'] = created_at_final
-            post['trip'] = trip
+            post['trip'] = trip'''
+            post.user = self.user_for_app( key.get().to_dict() )
+            post.user.user_key = user_key
+            post.post_key = post_key
+            #post.user_key = user_key
+            post.like_count = like_count
+            post.comment_count = comment_count
+            post.user_liked = user_liked
+            post.time_stamp = created_at_final
+            post.testthefuckisgoingon = 124243
+            post.trip = trip
             posts.append( post )
         return posts
 
@@ -181,8 +215,25 @@ class User(ndb.Model):
         user, user_key, friend, friend_key = cls.user_and_friend(user_url_key=user_url_key, friend_url_key=friend_url_key)
         if user_key.id() not in friend.friend_ids:
             friend.friend_ids.append( user_key.id() )
+            count = friend.numberOfFriends + 1
+            friend.numberOfFriends = count
+            if friend.key.id() in user.friend_request_ids:
+                user.friend_request_ids.remove( friend.key.id() )
+                friend.requested_friend_ids.remove( user.key.id() )
         if friend_key.id() not in user.friend_ids:
             user.friend_ids.append( friend_key.id() )
+            count = user.numberOfFriends + 1
+            user.numberOfFriends = count
+        
+        friend.put()
+        user.put()
+        
+    @classmethod
+    def deny_request(cls, user_url_key, friend_url_key):
+        user, user_key, friend, friend_key = cls.user_and_friend(user_url_key=user_url_key, friend_url_key=friend_url_key)
+        if friend.key.id() in user.friend_request_ids:
+            user.friend_request_ids.remove( friend.key.id() )
+            friend.requested_friend_ids.remove( user.key.id() )
         friend.put()
         user.put()
     
@@ -242,11 +293,15 @@ class User(ndb.Model):
         user.pop('hashed_password', None)
         user.pop('transaction_keys', None)
         user.pop('salt', None)
-        
         return user
     
+    @classmethod
+    def delete_user(cls, user_key):
+        key = ndb.Key(urlsafe=user_key)
+        key.delete()
+    
         
-class Post(ndb.Model):
+class Post(ndb.Expando):
     user_key = ndb.KeyProperty(kind=User)
     user = ndb.StructuredProperty(User)
     text = ndb.StringProperty()
@@ -255,6 +310,7 @@ class Post(ndb.Model):
     user_liked = ndb.BooleanProperty()
     time_zone = ndb.StringProperty()
     created_at = ndb.DateTimeProperty(auto_now_add=True) 
+    
     
     @classmethod
     def create_post(cls, user_key, text, trip_key, time_zone):
@@ -308,6 +364,7 @@ class Comment(ndb.Model):
             created_at_final = DateManager(tz=tz, created_at=comment.created_at).final_time
             comment = comment.to_dict()
             comment['user'] = User.user_for_app( post.user_key.get().to_dict() )
+            comment['user']['user_key'] = post.user_key.urlsafe()
             comment['post_key'] = post_key_urlsafe
             comment['user_key'] = user_key_urlsafe
             comment['created_at'] = created_at_final
