@@ -5,16 +5,25 @@ api_version: 1
 threadsafe: yes
 
 handlers:
+
+- url: /legal/.*
+  script: legal.app
+  
 - url: /favicon\.ico
   static_files: favicon.ico
   upload: favicon\.ico
   
+
+  
 - url: /
   static_files: www/index.html
   upload: www/index.html
+ 
+
 
 - url: /api/.*
   script: main.app
+ 
   
 - url: /tasks/.*
   script: worker.app
@@ -31,9 +40,7 @@ handlers:
 - url: /fonts
   static_dir: www/fonts
   
-
-  
-
 libraries:
 - name: webapp2
   version: "2.5.2"
+  

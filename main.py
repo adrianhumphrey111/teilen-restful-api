@@ -28,10 +28,9 @@ from notificationManager import FBNotification
 from dateManager import DateManager
 import stripe
 import config
-import logging
+import mammoth
 
 stripe.api_key = config.stripe_api_key_secret
-logging.getLogger().setLevel(logging.INFO)
 
 def json_handler(x):
     if isinstance(x, datetime.datetime):
@@ -64,7 +63,7 @@ def chargeRider(user, trip):
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
-        self.response.write('Hello world!')
+        self.response.write('lkjlkj')
         
 class LoginHandler(webapp2.RequestHandler):
     def get(self):
@@ -105,7 +104,13 @@ class LoginHandler(webapp2.RequestHandler):
         
 class SearchHandler(webapp2.RequestHandler):
     def post(self):
-        self.response.write('Currently scrapping web for information on your goal')
+        q_str = self.request.get('q')
+        
+        #Search by username only
+        users = User.query( User.user_name == q_str ).fetch()
+        self.response.headers['Content-Type'] = 'application/json'  
+        self.response.out.write(json.dumps([user.to_dict() for user in users], default=json_handler))
+        
         
 class LikePostTaskHandler(webapp2.RequestHandler):
     def post(self):
@@ -231,11 +236,20 @@ class FetchUserFeedHandler(webapp2.RequestHandler):
         
 class UpdateUserHandler(webapp2.RequestHandler):
     def post(self):
-        params = self.request.params
         user_key = self.request.get('user_key')
+        first_name = self.request.get('first_name')
+        last_name = self.request.get('last_name')
+        email = self.request.get('email')
         
-
-        User.updateUser(self, params)
+        user = ndb.Key(urlsafe=user_key).get(  use_cache=False, use_memcache=False )
+        user.first_name = first_name
+        user.last_name = last_name
+        user.email = email
+        user.put()
+        
+        obj = {}
+        obj['success'] = True
+        self.response.headers['Content-Type'] = 'application/json'  
         self.response.out.write("Updated User")
     
 
@@ -665,9 +679,19 @@ class DenyRiderHandler(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'application/json'  
         self.response.out.write(json.dumps(obj, default=json_handler))  
         
+class PrivacyHandler(webapp2.RequestHandler):
+    def get(self):
+        INDEX_HTML = open('privacy.html').read()
+        self.response.out.write(INDEX_HTML)
+
+class TermsHandler(webapp2.RequestHandler):
+    def get(self):
+        INDEX_HTML = open('terms.html').read()
+        self.response.out.write(INDEX_HTML)
+        
 
 app = webapp2.WSGIApplication([
-    ('/', MainHandler),
+    ('/api/', MainHandler),
     ('/api/login', LoginHandler),
     ('/api/search', SearchHandler),
     ('/api/likePost', LikePostTaskHandler),
@@ -693,5 +717,8 @@ app = webapp2.WSGIApplication([
     ('/api/denyFriend', DenyFriendTasksHandler),
     ('/api/requestFriend', RequestFriendTaksHandler),
     ('/api/removeFriend', RemoveFriendTaksHandler),
-    ('/api/removeRequest', RemoveRequestHandler)
+    ('/api/removeRequest', RemoveRequestHandler),
+    ('/api/privacy-policy', PrivacyHandler),
+    ('/api/terms-of-service', TermsHandler)
+   
 ], debug=True)

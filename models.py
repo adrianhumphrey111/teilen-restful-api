@@ -89,7 +89,9 @@ class Notification(ndb.Model):
 class User(ndb.Expando):
     first_name = ndb.StringProperty()
     last_name = ndb.StringProperty()
+    full_name = ndb.StringProperty()
     email = ndb.StringProperty()
+    user_name = ndb.StructuredProperty()
     school = ndb.StringProperty()
     salt = ndb.StringProperty()
     hashed_password = ndb.StringProperty()
@@ -124,6 +126,7 @@ class User(ndb.Expando):
         user = User()
         user.first_name = first_name
         user.last_name = last_name
+        user.full_name = first_name + ' ' + last_name
         user.email = email
         user.facebook_id = facebook_id
         user.profile_pic_url = profile_pic_url
