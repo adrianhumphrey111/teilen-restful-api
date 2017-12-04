@@ -210,7 +210,8 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         
 class FetchFeedHandler(webapp2.RequestHandler):
     def get(self):
-        if ( self.request.get('user_key') == None or self.request.get('user_key') == None ):
+        print self.request.get('user_key')
+        if ( self.request.get('user_key') == None or self.request.get('user_key') == "" ):
             self.response.headers['Content-Type'] = 'application/json'
             self.response.out.write(json.dumps([], default=json_handler))
         else:

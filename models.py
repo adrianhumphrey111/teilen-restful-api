@@ -91,7 +91,7 @@ class User(ndb.Expando):
     last_name = ndb.StringProperty()
     full_name = ndb.StringProperty()
     email = ndb.StringProperty()
-    user_name = ndb.StructuredProperty()
+    user_name = ndb.StringProperty()
     school = ndb.StringProperty()
     salt = ndb.StringProperty()
     hashed_password = ndb.StringProperty()
