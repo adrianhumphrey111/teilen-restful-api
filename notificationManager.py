@@ -1,11 +1,11 @@
 from google.appengine.ext import ndb
 from models import User
-import config
+import keys
 
 # Send to single device.
 from pyfcm import FCMNotification
 
-push_service = FCMNotification(api_key=config.fire_base_api_key)
+push_service = FCMNotification(api_key=keys.fire_base_api_key)
 
 class FBNotification:
 

@@ -3,29 +3,31 @@ Created on Nov 14, 2017
 
 @author: adrianhumphrey
 '''
-import config
 import os
 import stripe
 if os.environ.get('SERVER_SOFTWARE', '').startswith('Development'):
     stripe.verify_ssl_certs = False
 import time
+import keys
 
 class Payment:
     
-    def __init__(self, first_name="", last_name="", email=""):
+    def __init__(self, first_name="", last_name="", email="", stripe_custom_id="", update_dict={}):
         self.email = email
         self.first_name = first_name
         self.last_name = last_name
+        self.stripe_custom_id = stripe_custom_id
+        self.update_dict = update_dict
     
     def createCustomer(self):
-        stripe.api_key = config.stripe_api_key_secret
+        stripe.api_key = keys.stripe_api_key_secret
         resp = stripe.Customer.create(email=self.email)
         
         customer_id = resp["id"]
         return customer_id
         
     def createUser(self):
-        stripe.api_key = config.stripe_api_key_secret
+        stripe.api_key = keys.stripe_api_key_secret
         resp = stripe.Account.create(
                               type="custom",
                               country="US",
@@ -53,8 +55,69 @@ class Payment:
         
         return acc_id
     
+    def updateDriverInfo(self, params):
+        stripe.api_key = keys.stripe_api_key_secret
+        account = stripe.Account.retrieve(params['stripe_id'])
+        
+        if ( account.legal_entity.verification.status != "verified"):
+            # Last Four of Social
+            account.legal_entity.ssn_last_4 = params['last_four']
+            
+        # Birthday
+        account.legal_entity.dob.day = params['dob[day]']
+        account.legal_entity.dob.month = params['dob[month]']
+        account.legal_entity.dob.year = params['dob[year]']
+        
+        # Set Address
+        account.legal_entity.address.city = params['address[city]']
+        account.legal_entity.address.line1 = params['address[line1]']
+        account.legal_entity.address.state = params['address[state]']
+        account.legal_entity.address.postal_code = params['address[postal_code]']
+        
+        exp_month = int(params['credit_card[exp_month]'])
+        exp_year = int(params['credit_card[exp_year]'])
+        number = params['credit_card[number]']
+        cvv = params['credit_card[cvv]']
+        
+        #Create a token
+        resp = stripe.Token.create(
+                  card={
+                    "number": number,
+                    "exp_month": exp_month,
+                    "exp_year": exp_year,
+                    "cvc": cvv,
+                    "currency" : "usd"
+                  },
+                )
+        
+        token = resp['id']
+        
+        #Create the users external account
+        resp = account.external_accounts.create(external_account=token)
+        
+        #User should now be able to be paid out
+        account.save()
+        
+        #return the card id
+        return resp["id"]
+    
+    def payoutToDriver(self, amount):
+        stripe.api_key = keys.stripe_api_key_secret
+    
+        #Payout to the driver instantly
+        resp = stripe.Payout.create(
+                  amount=amount,
+                  currency="usd",
+                  method="instant",
+                  stripe_account=self.stripe_custom_id
+                )
+        print resp
+        
+        #Do something with the response
+        
+        
     def addCard(self):
-        stripe.api_key = config.stripe_api_key_secret
+        stripe.api_key = keys.stripe_api_key_secret
         acc_id = "acct_1BOJFkA6DKpcTIJK"
          #Get the response of this call
         account = stripe.Account.retrieve(acc_id)
@@ -62,7 +125,7 @@ class Payment:
         account.external_accounts.create(external_account={token.id})
     
     def cardToken(self):
-        stripe.api_key = config.stripe_api_key_publish
+        stripe.api_key = keys.stripe_api_key_publish
         token = stripe.Token.create(
                         card={
                             "number": '4232230106071918',
@@ -76,7 +139,7 @@ class Payment:
         return token
     
     def chargeRider(self, amount, customer_id, transaction_key):
-        stripe.api_key = config.stripe_api_key_secret
+        stripe.api_key = keys.stripe_api_key_secret
         
         try:
             # Use Stripe's library to make requests...

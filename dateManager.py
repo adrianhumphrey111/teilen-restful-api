@@ -7,9 +7,6 @@ Created on Nov 25, 2017
 from datetime import datetime
 import pytz
 
-
-
-
 class DateManager:
     '''Classify Post times. 
         1m - 59m

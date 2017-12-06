@@ -27,10 +27,11 @@ from payment import Payment
 from notificationManager import FBNotification
 from dateManager import DateManager
 import stripe
-import config
-import mammoth
+import keys
 
-stripe.api_key = config.stripe_api_key_secret
+
+
+stripe.api_key = keys.stripe_api_key_secret
 
 def json_handler(x):
     if isinstance(x, datetime.datetime):
@@ -104,10 +105,16 @@ class LoginHandler(webapp2.RequestHandler):
         
 class SearchHandler(webapp2.RequestHandler):
     def post(self):
+        self_user = ndb.Key( urlsafe=str(self.request.get('user_key')) ).get()
         q_str = self.request.get('q')
         
         #Search by username only
-        users = User.query( User.user_name == q_str ).fetch()
+        users = User.query( User.full_name == q_str ).fetch()
+        for user in users:
+            is_friend = self_user.is_friend( friend_key=user.key )
+            user.is_friend = is_friend
+            user.user_key = user.key.urlsafe()
+        print( users )
         self.response.headers['Content-Type'] = 'application/json'  
         self.response.out.write(json.dumps([user.to_dict() for user in users], default=json_handler))
         
@@ -191,7 +198,8 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         end_location = Location(address1=end_address1, address2=end_address2, city=end_address_city, state=end_address_state)
         
         #Create the Trip to be associated with the post
-        trip_key = Trip.create_trip(start_location=start_location, 
+        trip_key, eta = Trip.create_trip(tz=time_zone,
+                                    start_location=start_location, 
                                     end_location=end_location, 
                                     posted_by=posted_by, 
                                     posted_by_key=user_key, 
@@ -205,7 +213,8 @@ class CreateMediaPostTaskHandler(webapp2.RequestHandler):
         #SEnd Response
         self.response.headers['Content-Type'] = 'application/json' 
         obj = {'post_key': post_key,
-               'trip_key': trip_key}
+               'trip_key': trip_key.urlsafe(),
+               'eta': eta}
         self.response.write(json.dumps(obj , default=json_handler) )
         
 class FetchFeedHandler(webapp2.RequestHandler):
@@ -445,7 +454,7 @@ class StripeTempKeyHandler(webapp2.RequestHandler):
         customer_id = params['customer_id']
         api_version = params['api_version']
        
-        stripe.api_key = config.stripe_api_key_secret
+        stripe.api_key = keys.stripe_api_key_secret
         key = stripe.EphemeralKey.create(customer=customer_id, api_version=api_version)
         
         #Return json key
@@ -629,6 +638,11 @@ class AcceptRiderHanlder(webapp2.RequestHandler):
                                                      from_user_key=user_key)
                 fb_notification.send()
                 
+                #Add to the drivers payout rate
+                amount = trip.rate_per_seat
+                amount -= 31
+                trip.total_driver_payout = trip.total_driver_payout + amount
+                
                 #Save trip, user, rider, notification
                 user.put()
                 rider.put()
@@ -678,7 +692,44 @@ class DenyRiderHandler(webapp2.RequestHandler):
         obj = {}
         obj['success'] = True
         self.response.headers['Content-Type'] = 'application/json'  
-        self.response.out.write(json.dumps(obj, default=json_handler))  
+        self.response.out.write(json.dumps(obj, default=json_handler)) 
+        
+class UpdateDriverPaymentHandler(webapp2.RequestHandler):
+    def post(self):
+        params = self.request.params
+        print params
+        
+        payment = Payment()
+        payment.updateDriverInfo(params=params)
+        
+class StartRideHandler(webapp2.RequestHandler):
+    def post(self):
+        
+        params = self.request.params
+        trip_key = params['trip_key']
+        trip = ndb.Key(urlsafe=trip_key).get()
+        passengers = []
+        for rider_key in trip.passenger_keys:
+            passengers.append( ndb.Key(urlsafe=rider_key).get() )
+        
+        #We now have all of the riders and the driver
+        driver = ndb.Key(urlsafe=trip.posted_by_key).get()
+        
+        #Set the trip status
+        trip.status = "in_progress"
+        trip.start_time = datetime.datetime.now()
+        
+        #Pay the driver 75% of the total driver payout
+        percent_amount = trip.total_driver_payout * 0.75 #round this number up, and subtract it form total, sinc they are integers
+        to_driver_amount = trip.total_driver_payout - percent_amount
+        payment = Payment(stripe_custom_id=driver.stripe_account_id)
+        id = payment.payoutToDriver(amount=to_driver_amount)
+        
+        obj = {}
+        obj['card_id'] = id
+        self.response.headers['Content-Type'] = 'application/json'  
+        self.response.out.write(json.dumps(obj, default=json_handler)) 
+
         
 class PrivacyHandler(webapp2.RequestHandler):
     def get(self):
@@ -701,6 +752,7 @@ app = webapp2.WSGIApplication([
     ('/api/unlikePost', UnLikePostTaskHandler),
     ('/api/acceptRider', AcceptRiderHanlder),
     ('/api/denyRider', DenyRiderHandler),
+    ('/api/startRide', StartRideHandler),
     ('/api/fetchNotifications', FetchNotificationsHandler),
     ('/api/commentPost', CommentPostTasksHandler),
     ('/api/createPost', CreateMediaPostTaskHandler),
@@ -709,6 +761,7 @@ app = webapp2.WSGIApplication([
     ('/api/handleNotification', NotificationTaskHandler),
     ('/api/createUser', CreateUserTasksHandler),
     ('/api/updateNotificationToken', UpdateTokenHandler),
+    ('/api/updateDriverPayment', UpdateDriverPaymentHandler),
     ('/api/ephemeral_keys', StripeTempKeyHandler),
     ('/api/updateUser', UpdateUserHandler),
     ('/api/deletePost', DeletePostHandler),

@@ -42,37 +42,39 @@ class Trip(ndb.Expando):
     end_time = ndb.DateTimeProperty()
     start_location = ndb.StructuredProperty( Location )
     end_location = ndb.StructuredProperty( Location )
+    total_driver_payout = ndb.IntegerProperty()
     #driver_key = ndb.IntegerProperty() is now posted_by
     passenger_keys = ndb.StringProperty(repeated=True)
     wait_list = ndb.StringProperty(repeated=True)
     seats_available = ndb.IntegerProperty()
     requests = ndb.StringProperty(repeated=True) #List of strings of users that have submitted a request
-    status = ndb.StructuredProperty(TripStatus)
+    status = ndb.StringProperty()
     radius = ndb.IntegerProperty()
     chosen_time = ndb.StringProperty() #Either arrival or departure
     eta = ndb.DateTimeProperty()
-    rate_per_seat = ndb.IntegerProperty() #in USD
+    rate_per_seat = ndb.IntegerProperty() #in USD in cents
     posted_by = ndb.StringProperty() #driver or rider
     posted_by_key = ndb.StringProperty() #the key for the user that actually posted the ride
 
     @classmethod
-    def create_trip(cls, start_location=None, end_location=None, posted_by="", posted_by_key="", seats_available=0, rate_per_seat=0, radius=0, eta="", time_chosen=""):
+    def create_trip(cls, tz=None, start_location=None, end_location=None, posted_by="", posted_by_key="", seats_available=0, rate_per_seat=0, radius=0, eta="", time_chosen=""):
         trip = Trip()
         trip.posted_by_key = posted_by_key
         trip.start_location = start_location
         trip.end_location = end_location
         trip.posted_by = posted_by
-        trip.tripStatus = TripStatus.LOOKING
+        trip.tripStatus = "not_started"
         trip.seats_available = seats_available
         trip.rate_per_seat = rate_per_seat
         trip.requests = []
+        trip.total_driver_payout = 0
         trip.radius = radius
         '''Convert to date'''
         trip.eta = datetime.strptime(eta, "%Y-%m-%d %H:%M:%S")
         trip.time_chosen = time_chosen
         trip_key = trip.put()
-
-        return trip_key
+        eta = DateManager(tz=tz, created_at=trip.eta).eta_time()
+        return trip_key, eta
     
     
 class Notification(ndb.Model):

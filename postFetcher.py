@@ -52,6 +52,7 @@ class PostFetcher:
             for friend_id in self.user.friend_ids:
                 self.users.append( ndb.Key('User', friend_id).get() )
             
+            
     def addAllPosts(self):
         for user in self.users:
             is_friend = self.user.is_friend( friend_key=user.key )
